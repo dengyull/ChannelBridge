@@ -43,6 +43,13 @@ public class LanguageForm : Form
         title.Text = Text; OnLanguageChanged(); Invalidate(true);
     }
     protected virtual void OnLanguageChanged() { }
+    protected Button AddCaptionAction(string text, Action action)
+    {
+        var button = new ModernButton { Text = text, Width = 112, Dock = DockStyle.Right };
+        button.Click += (_, _) => action();
+        caption.Controls.Add(button); caption.Controls.SetChildIndex(button, 1);
+        return button;
+    }
     protected void VerifyCaption()
     {
         var minimize = caption.Controls.OfType<Button>().Single(b => b.Text == "—");

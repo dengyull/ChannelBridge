@@ -19,6 +19,13 @@ Assign physical devices and L/R outputs on a visual speaker map. A Windows servi
 - Three microphone trials, median-based compensation, then three verification trials.
 - Live Chinese/English switching with a remembered language choice.
 
+## What's new in v1.0.1
+
+- **Lower background CPU usage**: periodic format checks query only the selected source instead of enumerating every audio device. Temporary audio clients are disposed promptly.
+- **Low latency and advanced buffers**: the low-latency preset requests **25ms capture / 50ms routing input / 20ms output**. Use **Advanced → Audio buffers** at the top right to edit each value, then apply the configuration. Settings persist across restarts and are used during microphone calibration.
+
+Standard mode remains 100/80/40ms; profiles from the previous public release retain standard mode. 50ms is a queue target, not total playback latency. Drivers may adjust actual sizes, and smaller values may cause crackling. See the [release notes](docs/releases/v1.0.1.md).
+
 ## Getting started
 
 1. Download the Windows x64 ZIP from [Releases](../../releases/latest), extract it and run `ChannelBridge.exe`. The .NET runtime is included.

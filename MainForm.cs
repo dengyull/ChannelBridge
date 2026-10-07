@@ -10,6 +10,11 @@ public sealed class MainForm : LanguageForm
     readonly NumericUpDown gain = new() { DecimalPlaces = 1, Increment = .5m, Minimum = -60, Maximum = 6, Width = 136 };
     readonly NumericUpDown delay = new() { Maximum = 500, Width = 136 };
     readonly CheckBox mute = new() { Text = "静音此音箱", AutoSize = true };
+    readonly CheckBox lowLatency = new() { Text = "低延迟（缓冲 50ms）", AutoSize = true, Margin = new(6, 8, 8, 3) };
+    readonly ToolTip latencyTip = new();
+    BufferSettings buffers = BufferSettings.Standard;
+    readonly ContextMenuStrip advancedMenu = new();
+    readonly Button advanced;
     readonly Label info = Label("", 13), status = Label("", 13), summary = Label("", 13), detail = Label("", 13), speakerTitle = Label("", 24, true);
     readonly SpeakerMap map = new() { Dock = DockStyle.Fill };
     readonly Panel viewport = new() { Dock = DockStyle.Fill, AutoScroll = true };
@@ -47,6 +52,7 @@ public sealed class MainForm : LanguageForm
         root.RowStyles.Add(new(SizeType.Percent, 100)); root.RowStyles.Add(new(SizeType.Absolute, 57)); root.RowStyles.Add(new(SizeType.Absolute, 27));
         var header = new Panel { Dock = DockStyle.Fill };
         systemSound = Button("系统声音设置", () => Open("mmsys.cpl"));
+        advanced = AddCaptionAction("高级设置 ▾", ShowAdvancedMenu);
         systemSound.Dock = DockStyle.Right; systemSound.Width = 152;
         header.Controls.Add(systemSound);
         header.Controls.Add(new Label { Text = "ChannelBridge", AutoSize = true, Font = UiFont(28, true), Location = new(0, 0), ForeColor = Ink });
@@ -54,7 +60,9 @@ public sealed class MainForm : LanguageForm
         layout.Items.AddRange(SpeakerLayouts.All); layout.SelectedItem = SpeakerLayouts.Get("5.1");
         refresh = Button("刷新设备", RefreshDevices); autoMatch = Button("自动匹配：开", () => { automaticSource = !automaticSource; if (automaticSource) MatchSource(); Render(); FitPage(); });
         var top = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true };
-        top.Controls.AddRange(new Control[] { Caption("播放音源"), source, Caption("声道配置"), layout, refresh, autoMatch }); root.Controls.Add(top, 0, 1);
+        top.Controls.AddRange(new Control[] { Caption("播放音源"), source, Caption("声道配置"), layout, refresh, autoMatch, lowLatency }); root.Controls.Add(top, 0, 1);
+        lowLatency.CheckedChanged += (_, _) => { if (!loading) { buffers = lowLatency.Checked ? BufferSettings.LowLatency : BufferSettings.Standard; RefreshBufferLabel(); status.Text = "缓冲设置将在应用配置后生效；切换模式后建议重新测量延迟补偿。"; } };
+        latencyTip.SetToolTip(lowLatency, UiLanguage.T("关闭时使用标准缓冲。50ms 是转发缓冲目标；高级设置可分别调整捕获、转发和输出缓冲。"));
         info.Dock = DockStyle.Fill; info.TextAlign = ContentAlignment.MiddleLeft; info.ForeColor = MutedInk; root.Controls.Add(info, 0, 2);
         body.ColumnStyles.Add(new(SizeType.Percent, 100)); body.ColumnStyles.Add(new(SizeType.Absolute, 376)); root.Controls.Add(body, 0, 3);
         left.RowStyles.Add(new(SizeType.Percent, 100)); left.RowStyles.Add(new(SizeType.Absolute, 67)); left.Controls.Add(map, 0, 0);
@@ -84,7 +92,7 @@ public sealed class MainForm : LanguageForm
         sourceChannel.SelectedIndexChanged += (_, _) => EditSelected(); destination.SelectedIndexChanged += (_, _) => EditSelected(); outputSide.SelectedIndexChanged += (_, _) => EditSelected();
         gain.ValueChanged += (_, _) => EditSelected(); delay.ValueChanged += (_, _) => EditSelected(); mute.CheckedChanged += (_, _) => EditSelected();
         timer.Tick += (_, _) => UpdateMeters(); timer.Start();
-        FormClosing += (_, _) => { timer.Dispose(); };
+        FormClosing += (_, _) => { timer.Dispose(); latencyTip.Dispose(); advancedMenu.Dispose(); };
         speakers = SpeakerLayouts.Create(CurrentLayout, null); RefreshDevices(); Render();
         // One 96-DPI baseline for native controls. Point fonts follow monitor DPI;
         // the custom map uses the same logical coordinate system independently.
@@ -97,8 +105,27 @@ public sealed class MainForm : LanguageForm
         FitPage();
     }
     public static Font UiFont(float size, bool bold = false) => new("Microsoft YaHei UI", size * 72 / 96, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Point);
+    void RefreshBufferLabel() => lowLatency.Text = buffers == BufferSettings.Standard || buffers == BufferSettings.LowLatency
+        ? "低延迟（缓冲 50ms）" : "自定义缓冲（高级设置）";
+    void ShowAdvancedMenu()
+    {
+        advancedMenu.Items.Clear();
+        advancedMenu.Items.Add(UiLanguage.T("音频缓冲…"), null, (_, _) => EditBuffers());
+        advancedMenu.Show(advanced, new Point(0, advanced.Height));
+    }
+    void EditBuffers()
+    {
+        using var dialog = new BufferSettingsForm(buffers);
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+        buffers = dialog.Settings;
+        bool prior = loading; loading = true;
+        try { lowLatency.Checked = buffers != BufferSettings.Standard; }
+        finally { loading = prior; }
+        RefreshBufferLabel();
+        status.Text = "缓冲设置将在应用配置后生效；切换模式后建议重新测量延迟补偿。";
+    }
     int Px(int logical) => (int)Math.Round(logical * DeviceDpi / 96f);
-    protected override void OnLanguageChanged() { if (source == null || page == null || run == null) return; FitPage(); map.Invalidate(); }
+    protected override void OnLanguageChanged() { if (source == null || page == null || run == null) return; latencyTip.SetToolTip(lowLatency, UiLanguage.T("关闭时使用标准缓冲。50ms 是转发缓冲目标；高级设置可分别调整捕获、转发和输出缓冲。")); FitPage(); map.Invalidate(); }
     void FitPage()
     {
         if (fittingPage || IsDisposed) return;
@@ -255,7 +282,7 @@ public sealed class MainForm : LanguageForm
         detail.ForeColor = conflict ? Color.FromArgb(190, 76, 49) : MutedInk;
     }
     void SetRunning(bool v) { stop.Enabled = v; }
-    SurroundProfile Draft() => new() { SourceId = Source?.Id ?? "", LayoutId = CurrentLayout.Id, Speakers = speakers, AutoMatchSource = automaticSource, FollowSourceVolume = followVolume };
+    SurroundProfile Draft() => new() { SourceId = Source?.Id ?? "", LayoutId = CurrentLayout.Id, Speakers = speakers, AutoMatchSource = automaticSource, FollowSourceVolume = followVolume, BufferMs = buffers.QueueMs, CaptureBufferMs = buffers.CaptureMs, OutputBufferMs = buffers.OutputMs };
     async void ServiceAction(Action action)
     {
         if (serviceBusy || preview) return;
@@ -306,8 +333,11 @@ public sealed class MainForm : LanguageForm
             nextSourceRefresh = DateTime.UtcNow.AddSeconds(2);
             try
             {
-                var actual = AudioEngine.Devices().FirstOrDefault(d => d.Id == Source?.Id);
-                if (actual != null && (actual.Channels != Source!.Channels || actual.Mask != Source.Mask || actual.Rate != Source.Rate)) RefreshDevices();
+                if (Source is { } selected)
+                {
+                    var actual = AudioEngine.DeviceFormat(selected.Id);
+                    if (actual != (selected.Channels, selected.Mask, selected.Rate)) RefreshDevices();
+                }
             }
             catch { }
         }
@@ -336,6 +366,7 @@ public sealed class MainForm : LanguageForm
         try
         {
             layout.SelectedItem = SpeakerLayouts.Get(p.LayoutId); speakers = p.Speakers; selectedRole = speakers[0].Role;
+            buffers = p.Buffers; lowLatency.Checked = buffers != BufferSettings.Standard; RefreshBufferLabel();
             var input = devices.FirstOrDefault(d => d.Id == p.SourceId);
             if (input == null && p.SourceId.Length > 0) { input = new Endpoint(p.SourceId, "[未连接] 原音源", 0, 0, 0); source.Items.Add(input); }
             source.SelectedItem = input;
@@ -359,6 +390,7 @@ public sealed class MainForm : LanguageForm
         try
         {
             layout.SelectedItem = SpeakerLayouts.Get(p.LayoutId); speakers = p.Speakers; selectedRole = speakers[0].Role;
+            buffers = p.Buffers; lowLatency.Checked = buffers != BufferSettings.Standard; RefreshBufferLabel();
             var input = devices.FirstOrDefault(d => d.Id == p.SourceId);
             if (input == null && p.SourceId.Length > 0) { input = new Endpoint(p.SourceId, "[未连接] 原音源，请重新选择", 0, 0, 0); source.Items.Add(input); } source.SelectedItem = input;
         }
@@ -391,6 +423,12 @@ public sealed class MainForm : LanguageForm
         if (run.Text != "▶ 启动服务 / 路由" || systemSound.Text != "系统声音设置") throw new Exception("Chinese UI restoration failed.");
         UiLanguage.Set(priorLanguage, false);
         if (JsonSerializer.Serialize(Draft()) != beforeLanguage) throw new Exception("Language switch changed draft routing.");
+        lowLatency.Checked = true;
+        var lowProfile = SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(Draft()), devices);
+        if (Source is { } previewSource && devices.All(d => d.Id != previewSource.Id)) devices.Add(previewSource);
+        lowLatency.Checked = false; SetProfile(lowProfile);
+        if (!lowLatency.Checked || Draft().BufferMs != 50) throw new Exception("Low latency draft restore failed.");
+        lowLatency.Checked = false;
         automaticSource = true; Render();
         if (sourceChannel.Visible || inspectorSpec[3].Control.Visible) throw new Exception("Automatic source controls must be hidden.");
         int automaticY = destination.Top;

@@ -14,6 +14,14 @@ static class Program
         UiLanguage.Load();
         if (args.Contains("--english")) UiLanguage.Set(true, false);
         if (args.Contains("--chinese")) UiLanguage.Set(false, false);
+        if (args.Length >= 2 && args[0] == "--buffer-ui-check")
+        {
+            using var form = new BufferSettingsForm(new BufferSettings(30, 65, 25));
+            form.Show(); Application.DoEvents();
+            if (form.Settings != new BufferSettings(30, 65, 25)) throw new Exception("Custom buffer dialog changed values.");
+            using var bitmap = new Bitmap(form.Width, form.Height); form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size)); bitmap.Save(args[1]);
+            return;
+        }
         if (args.Length == 2 && args[0] == "--latency-check")
         {
             try { File.WriteAllText(args[1], LatencyChecks.Run(Path.GetDirectoryName(Path.GetFullPath(args[1]))!)); }
@@ -129,7 +137,8 @@ static class Program
                 if (outputs.Count < 2) throw new Exception("Need two stereo endpoints for the backend check.");
                 using var enumerator = new MMDeviceEnumerator(); using var device = enumerator.GetDevice(input.Id);
                 using var silence = new WasapiOut(device, AudioClientShareMode.Shared, true, 40);
-                silence.Init(new ZeroProvider(device.AudioClient.MixFormat)); silence.Play();
+                using var formatClient = device.AudioClient;
+                silence.Init(new ZeroProvider(formatClient.MixFormat)); silence.Play();
                 using var engine = new AudioEngine(); string? fault = null; engine.Fault += e => fault = e;
                 engine.Start(input.Id, outputs.Select((e, i) => new Route(e.Id, i * 2, i * 2 + 1, 0, 0)).ToList());
                 Thread.Sleep(1500);
@@ -200,6 +209,33 @@ static class SelfTest
         for (int i = 0; i < 20000; i++) { drift.Push(sourceChunk, 480, 2); drift.Read(chunk, 0, chunk.Length); }
         Check(drift.Underruns == 0 && drift.Overruns == 0 && drift.BufferedMs > 15 && drift.BufferedMs < 200,
             $"200-second simulated independent clock (+2083 ppm) stays bounded: underruns={drift.Underruns}, overruns={drift.Overruns}, buffer={drift.BufferedMs:0.0}ms");
+        foreach (int outputFrames in new[] { 479, 481 })
+        {
+            var low = new AdaptiveStereo(48000, 48000, 0, 1, 1, 0, bufferMs: 50);
+            low.Push(new float[4800 * 2], 4800, 2);
+            var readBlock = new float[outputFrames * 2];
+            for (int i = 0; i < 20000; i++) { low.Push(sourceChunk, 480, 2); low.Read(readBlock, 0, readBlock.Length); }
+            Check(low.Underruns == 0 && low.Overruns == 0 && low.BufferedMs > 5 && low.BufferedMs < 80,
+                $"50ms buffer: 200-second drift at {outputFrames} output frames remains bounded");
+        }
+        var lowDelay = new AdaptiveStereo(48000, 48000, 0, 1, 1, 91, 1, 0, 50);
+        var jitterPacket = new float[960 * 2];
+        lowDelay.Push(new float[9600 * 2], 9600, 2);
+        var jitterOutput = new float[480 * 2];
+        for (int i = 0; i < 10000; i++)
+        {
+            // One capture wakeup is delayed by 10ms, then the accumulated packet arrives.
+            if (i % 100 != 50) lowDelay.Push(jitterPacket, i % 100 == 51 ? 960 : 480, 2);
+            lowDelay.Read(jitterOutput, 0, jitterOutput.Length);
+        }
+        Check(lowDelay.Underruns == 0 && lowDelay.Overruns == 0, "50ms buffer survives 10ms capture jitter with unequal 91/0ms speaker compensation");
+        var startLow = new AdaptiveStereo(48000, 48000, 0, 1, 1, 0, bufferMs: 50);
+        var startNormal = new AdaptiveStereo(48000, 48000, 0, 1, 1, 0);
+        var constant = Enumerable.Repeat(.25f, 2880 * 2).ToArray();
+        startLow.Push(constant, 2880, 2); startNormal.Push(constant, 2880, 2);
+        var firstSample = new float[2]; startLow.Read(firstSample, 0, 2);
+        Check(firstSample[0] > .2f, "50ms mode primes before standard 80ms mode");
+        startNormal.Read(firstSample, 0, 2); Check(firstSample[0] == 0, "Standard 80ms startup threshold preserved");
         var tone = new TestTone(48000, 1); var samples = new float[4800]; tone.Read(samples, 0, samples.Length);
         Check(samples.Where((_, i) => i % 2 == 0).All(x => x == 0) && samples.Any(x => x > .01), "test tone only reaches requested side");
         foreach (var layout in SpeakerLayouts.All)

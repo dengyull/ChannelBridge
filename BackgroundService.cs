@@ -7,7 +7,7 @@ using System.Text.Json;
 namespace ChannelBridge;
 
 public sealed record ServiceConfig(bool Enabled, SurroundProfile Profile, string Revision);
-public sealed record ServiceReport(string State, string Message, string Revision, long Frames, DateTime UpdatedUtc, int ProcessId, string TestRole = "", int TestIndex = 0, int TestCount = 0, string Version = "1.0.0", float SourceGain = 1, int SourceChannels = 0);
+public sealed record ServiceReport(string State, string Message, string Revision, long Frames, DateTime UpdatedUtc, int ProcessId, string TestRole = "", int TestIndex = 0, int TestCount = 0, string Version = "1.0.1", float SourceGain = 1, int SourceChannels = 0, int BufferMs = 80, long Underruns = 0, long Overruns = 0);
 
 public static class ServiceFiles
 {
@@ -29,7 +29,7 @@ public static class ServiceFiles
         if (new FileInfo(path).Length > 65536) throw new InvalidDataException("配置过大。");
         var c = JsonSerializer.Deserialize<ServiceConfig>(File.ReadAllText(path)) ?? throw new InvalidDataException("配置为空。");
         if (c.Profile == null || string.IsNullOrEmpty(c.Revision)) throw new InvalidDataException("配置不完整。");
-        SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(c.Profile), Array.Empty<Endpoint>());
+        c = c with { Profile = SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(c.Profile), Array.Empty<Endpoint>()) };
         return c;
     }
     public static ServiceConfig? ReadSaved()
@@ -95,8 +95,8 @@ public sealed class RoutingWorker : IDisposable
                         if (DateTime.UtcNow >= nextFormatCheck)
                         {
                             nextFormatCheck = DateTime.UtcNow.AddSeconds(1);
-                            var actual = AudioEngine.Devices().FirstOrDefault(d => d.Id == current.Profile.SourceId);
-                            if (actual == null || sourceFormat != (actual.Channels, actual.Mask, actual.Rate))
+                            var actual = AudioEngine.DeviceFormat(current.Profile.SourceId);
+                            if (sourceFormat != actual)
                             { DisposeAudio(); retry = DateTime.MinValue; }
                         }
                     }
@@ -114,7 +114,7 @@ public sealed class RoutingWorker : IDisposable
                             var routes = SpeakerLayouts.BuildRoutes(SpeakerLayouts.Resolve(current.Profile, source), source, devices);
                             sourceFormat = (source.Channels, source.Mask, source.Rate);
                             engine = new AudioEngine(); engine.Fault += e => Interlocked.Exchange(ref fault, e);
-                            engine.Start(source.Id, routes, current.Profile.FollowSourceVolume);
+                            engine.Start(source.Id, routes, current.Profile.FollowSourceVolume, current.Profile.Buffers.QueueMs, current.Profile.Buffers.CaptureMs, current.Profile.Buffers.OutputMs);
                         }
                         running = true;
                     }
@@ -125,7 +125,7 @@ public sealed class RoutingWorker : IDisposable
             }
         }
         catch (Exception ex) { message = "配置读取失败，保留当前运行配置：" + ex.Message; }
-        var report = new ServiceReport(calibration != null ? "Calibrating" : testSequence != null ? "Testing" : running ? "Running" : current?.Enabled == true ? "Waiting" : "Stopped", calibration != null ? calibration.Progress : testSequence != null ? $"正在测试 {testSequence.Index}/{testSequence.Count} · {testSequence.Role} · {SpeakerLayouts.Role(testSequence.Role).Name}" : testError.Length > 0 ? testError : message, current?.Revision ?? "", engine?.FramesCaptured ?? 0, DateTime.UtcNow, Environment.ProcessId, testSequence?.Role ?? "", testSequence?.Index ?? 0, testSequence?.Count ?? 0, SourceGain: engine?.SourceGain ?? 1, SourceChannels: engine?.SourceChannels ?? 0);
+        var report = new ServiceReport(calibration != null ? "Calibrating" : testSequence != null ? "Testing" : running ? "Running" : current?.Enabled == true ? "Waiting" : "Stopped", calibration != null ? calibration.Progress : testSequence != null ? $"正在测试 {testSequence.Index}/{testSequence.Count} · {testSequence.Role} · {SpeakerLayouts.Role(testSequence.Role).Name}" : testError.Length > 0 ? testError : message, current?.Revision ?? "", engine?.FramesCaptured ?? 0, DateTime.UtcNow, Environment.ProcessId, testSequence?.Role ?? "", testSequence?.Index ?? 0, testSequence?.Count ?? 0, SourceGain: engine?.SourceGain ?? 1, SourceChannels: engine?.SourceChannels ?? 0, BufferMs: current?.Profile.BufferMs ?? 80, Underruns: engine?.BufferUnderruns ?? 0, Overruns: engine?.BufferOverruns ?? 0);
         if (lastReport == null || report.State != lastReport.State || report.Message != lastReport.Message || report.Revision != lastReport.Revision || report.UpdatedUtc - lastReport.UpdatedUtc >= TimeSpan.FromSeconds(1))
         { ServiceFiles.AtomicWrite(Path.Combine(root, "status.json"), report); lastReport = report; }
     }

@@ -243,3 +243,21 @@ Windows 未接受所选声道模式：	Windows rejected the selected speaker lay
 Windows 声道设置失败。	Windows speaker configuration failed.
 恢复 Windows 音频设置失败。	Unable to restore Windows audio settings.
 ；恢复旧格式失败：	; restoring the original format failed: 
+低延迟（缓冲 40ms）	Low latency (40ms buffer)
+缓冲设置将在应用配置后生效；切换模式后建议重新测量延迟补偿。	Apply the configuration to change buffering. Recalibrate speaker delays after switching modes.
+关闭时缓冲为 80ms。40ms 是软件缓冲目标，不是实际总延迟；出现断音时请关闭低延迟。	Off uses an 80ms buffer. 40ms is the software buffer target, not total latency. Turn off low latency if audio breaks up.
+缓冲模式仅支持 40ms 或 80ms。	Only 40ms and 80ms buffer modes are supported.
+低延迟（缓冲 50ms）	Low latency (50ms buffer)
+自定义缓冲（高级设置）	Custom buffers (advanced)
+高级设置 ▾	Advanced ▾
+音频缓冲…	Audio buffers…
+高级设置 · 音频缓冲	Advanced · Audio buffers
+捕获缓冲 / ms	Capture buffer / ms
+转发输入缓冲 / ms	Routing input buffer / ms
+输出设备缓冲 / ms	Output device buffer / ms
+恢复 50ms 默认值	Reset to 50ms defaults
+关闭时使用标准缓冲。50ms 是转发缓冲目标；高级设置可分别调整捕获、转发和输出缓冲。	Off uses standard buffering. 50ms is the routing target. Advanced settings let you adjust capture, routing and output buffers separately.
+数值越小越容易爆音。设备可能调整实际缓冲。\n确定后请点击主界面的“应用配置”；总延迟还包含音箱补偿。	Smaller buffers may cause crackling. Drivers may adjust actual sizes.\nClick Apply in the main window to activate changes. Total latency also includes speaker compensation.
+捕获和输出缓冲范围为 10–500ms，转发缓冲范围为 10–1000ms。	Capture and output buffers must be 10–500ms; routing must be 10–1000ms.
+确定	OK
+取消	Cancel

@@ -141,7 +141,7 @@ public sealed class CalibrationRun : IDisposable
     void MeasureStage(SurroundProfile profile, Endpoint source, List<LatencyRow> rows, bool verification)
     {
         using var routing = new AudioEngine(); string? fault = null; routing.Fault += s => Interlocked.Exchange(ref fault, s);
-        routing.Start(source.Id, SpeakerLayouts.BuildRoutes(profile.Speakers, source, AudioEngine.Devices()), profile.FollowSourceVolume);
+        routing.Start(source.Id, SpeakerLayouts.BuildRoutes(profile.Speakers, source, AudioEngine.Devices()), profile.FollowSourceVolume, profile.Buffers.QueueMs, profile.Buffers.CaptureMs, profile.Buffers.OutputMs);
         foreach (var row in rows)
         for (int repeat = 0; repeat < 3; repeat++)
         {

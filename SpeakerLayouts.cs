@@ -27,6 +27,13 @@ public sealed class SurroundProfile
     public List<SpeakerSetting> Speakers { get; set; } = new();
     public bool AutoMatchSource { get; set; } = true;
     public bool FollowSourceVolume { get; set; } = true;
+    public int BufferMs { get; set; } = 80;
+    public int? CaptureBufferMs { get; set; }
+    public int? OutputBufferMs { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public BufferSettings Buffers => new(CaptureBufferMs ?? (BufferMs == 80 ? 100 : BufferSettings.LowLatency.CaptureMs),
+        BufferMs == 40 && CaptureBufferMs == null && OutputBufferMs == null ? 50 : BufferMs,
+        OutputBufferMs ?? (BufferMs == 80 ? 40 : 20));
 }
 public static class SpeakerLayouts
 {
@@ -121,6 +128,7 @@ public static class SpeakerLayouts
         {
             var p = JsonSerializer.Deserialize<SurroundProfile>(json) ?? throw new InvalidOperationException("配置为空。");
             if (p.Version != 2 || p.Speakers == null || p.SourceId == null) throw new InvalidOperationException("不支持此配置版本。");
+            var buffers = p.Buffers; buffers.Validate(); p.BufferMs = buffers.QueueMs; p.CaptureBufferMs = buffers.CaptureMs; p.OutputBufferMs = buffers.OutputMs;
             var layout = Get(p.LayoutId); ValidateSettings(p.Speakers);
             if (!p.Speakers.Select(s => s.Role).Order().SequenceEqual(layout.Roles.Order())) throw new InvalidOperationException("音箱列表与布局不符。");
             return p;

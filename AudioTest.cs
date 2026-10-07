@@ -52,7 +52,8 @@ public sealed class AudioTestSequence : IDisposable
             using var enumerator = new MMDeviceEnumerator(); device = enumerator.GetDevice(s.DeviceId);
             player = new WasapiOut(device, AudioClientShareMode.Shared, true, 40);
             player.PlaybackStopped += (_, e) => { if (e.Exception != null) Interlocked.Exchange(ref playbackError, e.Exception.Message); };
-            signal = new TestSignal(device.AudioClient.MixFormat.SampleRate, s) { MasterGain = VolumeGain() };
+            using var formatClient = device.AudioClient;
+            signal = new TestSignal(formatClient.MixFormat.SampleRate, s) { MasterGain = VolumeGain() };
             player.Init(signal); player.Play();
         }
         next = now.AddMilliseconds(1300 + s.DelayMs);

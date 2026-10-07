@@ -40,3 +40,14 @@ The `ChannelBridge.Audio` service starts automatically and reads `%ProgramData%\
 **Save preset** exports a JSON preset. **Load preset** edits the current preset; click Apply to save it to the service. Applying a layout may briefly interrupt playback; some players need to restart playback after their output format changes.
 
 Windows layout synchronization uses an undocumented audio-policy interface and validates the result. Other Windows/driver versions can reject it; errors are reported and rollback is attempted. Third-party licenses are in `app/licenses`.
+
+## Low latency mode
+
+Enable “Low latency (50ms buffer)” at the top, then apply the configuration. Off preserves the standard mode. Existing profiles default to standard mode. Saved profiles, service restarts and microphone calibration use the selected mode.
+
+| Mode | Capture buffer request | Routing queue target | Output buffer request |
+| --- | --- | --- | --- |
+| Standard | 100ms (poll roughly every 50ms) | 80ms + speaker compensation | 40ms |
+| Low latency | 25ms (poll at roughly half the actual buffer duration) | 50ms + speaker compensation | 20ms |
+
+50ms is the routing queue's base target, not end-to-end latency. Drivers may adjust actual buffer sizes. VB-CABLE internal buffering, Windows mixing, device latency and acoustic travel time still contribute. This option does not change VB-CABLE's global internal buffer settings. Recalibrate speaker delays after switching modes. If audio breaks up, turn low latency off and apply the configuration. Advanced → Audio buffers in the top-right menu accepts individual capture/output values of 10–500ms and routing values of 10–1000ms. Confirm, then Apply in the main window. Reset restores 25/50/20ms. Legacy 40ms presets migrate to 50ms; explicit custom values are preserved. Smaller values are more prone to crackling and may not be supported by every driver.

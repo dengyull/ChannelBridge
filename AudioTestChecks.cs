@@ -6,6 +6,24 @@ public static class AudioTestChecks
     {
         void Check(bool condition, string name) { if (!condition) throw new Exception(name); }
         var p = new SurroundProfile { SourceId = "source", LayoutId = "2.1", Speakers = SpeakerLayouts.Create(SpeakerLayouts.Get("2.1"), null) };
+        string legacy = JsonSerializer.Serialize(p).Replace(",\"BufferMs\":80", "");
+        Check(SpeakerLayouts.ReadProfile(legacy, Array.Empty<Endpoint>()).BufferMs == 80, "Old profiles retain standard buffer");
+        var migrated = SpeakerLayouts.ReadProfile(legacy.Replace("\"FollowSourceVolume\":true", "\"FollowSourceVolume\":true,\"BufferMs\":40"), Array.Empty<Endpoint>());
+        Check(migrated.Buffers == BufferSettings.LowLatency, "Legacy 40ms preset migrates to 50ms");
+        var custom = new SurroundProfile { LayoutId = p.LayoutId, Speakers = p.Speakers, BufferMs = 65, CaptureBufferMs = 30, OutputBufferMs = 25 };
+        Check(SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(custom), Array.Empty<Endpoint>()).Buffers == new BufferSettings(30, 65, 25), "All three custom buffers survive profile round-trip");
+        custom.BufferMs = 40;
+        Check(SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(custom), Array.Empty<Endpoint>()).BufferMs == 40, "Explicit custom 40ms is not migrated");
+        custom.CaptureBufferMs = 0;
+        bool invalidCapture = false;
+        try { SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(custom), Array.Empty<Endpoint>()); } catch (ArgumentOutOfRangeException) { invalidCapture = true; }
+        Check(invalidCapture, "Invalid custom capture buffer rejected");
+        p.BufferMs = 50;
+        Check(SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(p), Array.Empty<Endpoint>()).BufferMs == 50, "Low latency profile round-trip");
+        bool rejectedBuffer = false;
+        try { SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(p).Replace("\"BufferMs\":50", "\"BufferMs\":1"), Array.Empty<Endpoint>()); }
+        catch (ArgumentOutOfRangeException) { rejectedBuffer = true; }
+        Check(rejectedBuffer, "Unsupported buffer rejected");
         for (int i = 0; i < p.Speakers.Count; i++) { p.Speakers[i].SourceChannel = i; p.Speakers[i].DeviceId = "output-" + i; }
         p.Speakers.Single(s => s.Role == "FR").Muted = true;
         var now = DateTime.UtcNow;
@@ -63,7 +81,7 @@ public static class AudioTestChecks
             ServiceFiles.AtomicWrite(requestPath, Request() with { ExpiresUtc = DateTime.UtcNow.AddSeconds(-1) }); worker.Tick(); Check(Report().State == "Running", "Ignore expired test");
             ServiceFiles.AtomicWrite(requestPath, Request()); worker.Tick();
         }
-        using (var worker = new RoutingWorker(root, true)) { worker.Tick(); Check(Report().State == "Running", "Restart does not replay old test"); }
+        using (var worker = new RoutingWorker(root, true)) { worker.Tick(); Check(Report().State == "Running", "Restart does not replay old test"); Check(Report().BufferMs == 50, "Restart restores low latency mode"); }
         Check(ServiceFiles.Read(configPath).Revision == "saved" && ServiceFiles.Read(configPath).Enabled, "Tests preserve saved configuration");
         ServiceFiles.AtomicWrite(configPath, config with { Enabled = false, Revision = "stopped" });
         using (var worker = new RoutingWorker(root, true))

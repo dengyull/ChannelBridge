@@ -12,6 +12,14 @@ public record Endpoint(string Id, string Name, int Channels, int Rate, int Mask)
 public record Route(string DeviceId, int Left, int Right, float Gain, int DelayMs, float? RightGain = null, int? RightDelayMs = null);
 public record Profile(string SourceId, int Mode, List<Route> Routes);
 
+// Low-latency queues need capture packets sooner than the standard 50 ms poll.
+// Keep sleep-based capture compatible with Windows 10 versions before 1703.
+sealed class ShortBufferLoopbackCapture(MMDevice device, int bufferMs) : WasapiCapture(device, false, bufferMs)
+{
+    protected override AudioClientStreamFlags GetAudioClientStreamFlags() =>
+        base.GetAudioClientStreamFlags() | AudioClientStreamFlags.Loopback;
+}
+
 // Each physical device owns an independent clock. A small continuously adjusted
 // read ratio keeps its FIFO near the target, instead of periodically dropping blocks.
 public sealed class AdaptiveStereo : ISampleProvider
@@ -33,15 +41,16 @@ public sealed class AdaptiveStereo : ISampleProvider
     public double BufferedMs { get { lock (gate) return Math.Max(0, written - read) * 1000 / sourceRate; } }
     public double CorrectionPpm { get { lock (gate) return (ratio - 1) * 1e6; } }
 
-    public AdaptiveStereo(int inputRate, int outputRate, int l, int r, float volume, int delayMs, float? rightVolume = null, int? rightDelayMs = null)
+    public AdaptiveStereo(int inputRate, int outputRate, int l, int r, float volume, int delayMs, float? rightVolume = null, int? rightDelayMs = null, int bufferMs = 80)
     {
+        if (bufferMs is < 10 or > 1000) throw new ArgumentOutOfRangeException(nameof(bufferMs));
         sourceRate = inputRate; left = l; right = r;
         gains = new[] { volume, rightVolume ?? volume };
         int maxDelay = Math.Max(delayMs, rightDelayMs ?? delayMs);
         offsets = new[] { inputRate * (maxDelay - delayMs) / 1000, inputRate * (maxDelay - (rightDelayMs ?? delayMs)) / 1000 };
         maxOffset = offsets.Max();
         capacity = inputRate * 3; ring = new float[capacity * 2];
-        target = inputRate * (80 + maxDelay) / 1000;
+        target = inputRate * (bufferMs + maxDelay) / 1000;
         WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(outputRate, 2);
     }
     public void Push(float[] samples, int frames, int channels)
@@ -106,12 +115,14 @@ public sealed class AudioEngine : IDisposable
 {
     readonly List<(MMDevice Device, WasapiOut Player, AdaptiveStereo Buffer)> sinks = new();
     MMDevice? source;
-    WasapiLoopbackCapture? capture;
+    WasapiCapture? capture;
     volatile bool stopping;
     public event Action<string>? Fault;
     public IReadOnlyList<AdaptiveStereo> Buffers => sinks.Select(s => s.Buffer).ToArray();
     public int SourceChannels { get; private set; }
     public long FramesCaptured;
+    public long BufferUnderruns => sinks.Sum(s => s.Buffer.Underruns);
+    public long BufferOverruns => sinks.Sum(s => s.Buffer.Overruns);
     bool followSourceVolume;
     public float SourceGain { get; private set; } = 1;
     public void UpdateSourceVolume()
@@ -132,7 +143,8 @@ public sealed class AudioEngine : IDisposable
             {
                 try
                 {
-                    var f = d.AudioClient.MixFormat;
+                    using var client = d.AudioClient;
+                    var f = client.MixFormat;
                     result.Add(new(d.ID, d.FriendlyName, f.Channels, f.SampleRate,
                         ChannelMask(f)));
                 }
@@ -141,6 +153,17 @@ public sealed class AudioEngine : IDisposable
         }
         return result;
     }
+    // Runtime format checks need only the selected endpoint. Enumerating all
+    // endpoints also loads unrelated drivers and their property stores.
+    public static (int Channels, int Mask, int Rate) DeviceFormat(string id)
+    {
+        using var enumerator = new MMDeviceEnumerator();
+        using var device = enumerator.GetDevice(id);
+        if (device.State != DeviceState.Active) throw new IOException("音源设备不可用。");
+        using var client = device.AudioClient;
+        var format = client.MixFormat;
+        return (format.Channels, ChannelMask(format), format.SampleRate);
+    }
     static int ChannelMask(WaveFormat f)
     {
         if (f is not WaveFormatExtensible) return 0;
@@ -148,8 +171,9 @@ public sealed class AudioEngine : IDisposable
         try { return Marshal.ReadInt32(pointer, 20); }
         finally { Marshal.FreeHGlobal(pointer); }
     }
-    public void Start(string sourceId, IReadOnlyList<Route> routes, bool followVolume = false)
+    public void Start(string sourceId, IReadOnlyList<Route> routes, bool followVolume = false, int bufferMs = 80, int? captureBufferMs = null, int? outputBufferMs = null)
     {
+        if (bufferMs is < 10 or > 1000) throw new ArgumentOutOfRangeException(nameof(bufferMs));
         if (routes.Count == 0) throw new InvalidOperationException("至少选择一个输出设备。");
         if (routes.Any(r => r.DeviceId == sourceId)) throw new InvalidOperationException("音源不能同时作为目标设备，否则会产生反馈。");
         if (routes.Select(r => r.DeviceId).Distinct().Count() != routes.Count) throw new InvalidOperationException("每个输出设备只能使用一行，请在同一行设置左右声道。");
@@ -158,7 +182,9 @@ public sealed class AudioEngine : IDisposable
             using var enumerator = new MMDeviceEnumerator();
             source = enumerator.GetDevice(sourceId);
             followSourceVolume = followVolume;
-            capture = new WasapiLoopbackCapture(source);
+            var buffers = new BufferSettings(captureBufferMs ?? (bufferMs == 80 ? 100 : BufferSettings.LowLatency.CaptureMs), bufferMs, outputBufferMs ?? (bufferMs == 80 ? 40 : 20));
+            buffers.Validate();
+            capture = new ShortBufferLoopbackCapture(source, buffers.CaptureMs);
             var format = capture.WaveFormat;
             SourceChannels = format.Channels;
             ValidateFormat(format);
@@ -174,9 +200,11 @@ public sealed class AudioEngine : IDisposable
                 WasapiOut? player = null;
                 try
                 {
-                    if (device.AudioClient.MixFormat.Channels < 2) throw new InvalidOperationException($"{device.FriendlyName} 不是两声道设备。");
-                    var fifo = new AdaptiveStereo(format.SampleRate, device.AudioClient.MixFormat.SampleRate, r.Left, r.Right, r.Gain, r.DelayMs, r.RightGain, r.RightDelayMs);
-                    player = new WasapiOut(device, AudioClientShareMode.Shared, true, 40);
+                    using var formatClient = device.AudioClient;
+                    var outputFormat = formatClient.MixFormat;
+                    if (outputFormat.Channels < 2) throw new InvalidOperationException($"{device.FriendlyName} 不是两声道设备。");
+                    var fifo = new AdaptiveStereo(format.SampleRate, outputFormat.SampleRate, r.Left, r.Right, r.Gain, r.DelayMs, r.RightGain, r.RightDelayMs, bufferMs);
+                    player = new WasapiOut(device, AudioClientShareMode.Shared, true, buffers.OutputMs);
                     player.Init(new SampleToWaveProvider(fifo));
                     player.PlaybackStopped += (_, a) => { if (!stopping) Fault?.Invoke(a.Exception?.Message ?? "输出设备停止播放。"); };
                     sinks.Add((device, player, fifo));
