@@ -1,0 +1,245 @@
+ChannelBridge · 多设备环绕声	ChannelBridge · Multi-device surround
+环绕声映射  /  2.0 — 7.1	Surround routing / 2.0 — 7.1
+系统声音设置	System sound settings
+播放音源	Playback source
+声道配置	Speaker layout
+刷新设备	Refresh devices
+自动匹配：开	Auto-map: On
+自动匹配：关	Auto-map: Off
+音箱属性	Speaker settings
+音源声道	Source channel
+输出设备	Output device
+输出接口	Output channel
+增益 / dB	Gain / dB
+延迟补偿 / ms	Delay / ms
+静音此音箱	Mute speaker
+▶ 播放测试音频	▶ Test speaker
+▶ 启动服务 / 路由	▶ Start routing
+■ 停止路由	■ Stop routing
+保存配置…	Save preset…
+载入配置…	Load preset…
+▶ 测试配置	▶ Test preset
+应用配置	Apply preset
+重启服务	Restart service
+使用说明	Help
+系统音量：跟随	System volume: Follow
+系统音量：直通	System volume: Bypass
+麦克风测延迟	Measure latency
+L · 设备左声道	L · Left output
+R · 设备右声道	R · Right output
+刷新	Refresh
+音箱位置图	Speaker map
+点击音箱或用方向键选择，在右侧编辑其属性。	Select a speaker or use arrow keys, then edit its settings on the right.
+听音空间	Listening room
+点击音箱，配置对应输出	Select a speaker to assign its output
+听音位置	Listening position
+前中左	Front center L
+前中右	Front center R
+后中置	Rear center
+前左	Front L
+前右	Front R
+后左	Rear L
+后右	Rear R
+侧左	Side L
+侧右	Side R
+低音炮	Subwoofer
+中置	Center
+静音	Muted
+2.0 立体声	2.0 Stereo
+2.1 立体声 + 低音	2.1 Stereo + sub
+3.0 前置三声道	3.0 Front surround
+3.1 前置 + 低音	3.1 Front + sub
+4.0 四声道	4.0 Quad
+4.1 四声道 + 低音	4.1 Quad + sub
+5.0 五声道	5.0 Surround
+5.1 侧环绕	5.1 Side surround
+5.1 后环绕	5.1 Rear surround
+6.0 后中置环绕	6.0 Rear center surround
+6.1 后中置 + 低音	6.1 Rear center + sub
+7.0 侧置 + 后置	7.0 Side + rear
+7.1 侧置 + 后置 + 低音	7.1 Side + rear + sub
+声道	channels
+— 未分配设备 —	— No output assigned —
+— 未连接音源 —	— No source channel —
+[未连接] 原音源，请重新选择	[Offline] Previous source; select again
+[未连接] 原音源	[Offline] Previous source
+[未连接] 原输出设备	[Offline] Previous output
+[无效] 不能回接音源	[Invalid] Cannot route to source
+[不可用] 原声道	[Unavailable] Previous channel
+连接已就绪。	Ready.
+请检查音源和输出设备。	Check the source and output device.
+输出冲突：另一只音箱占用了相同的 L/R。	Output conflict: this L/R channel is already assigned.
+测试使用当前预设的增益与延迟，跳过静音音箱。	Tests use the current preset's gain and delay; muted speakers are skipped.
+测试期间暂停路由，结束后自动恢复。	Routing pauses during testing and resumes afterwards.
+蓝框为选中音箱；图标下显示独立增益。点击音箱或使用右侧下拉框选择。	Select a speaker on the map or in the list. Each speaker shows its gain.
+只音箱	 speakers
+只已就绪	 ready
+台输出设备	 output devices
+实际音源	Source
+目标布局	Layout
+。应用配置将同步 Windows 声道模式并匹配路由。	. Applying the preset also updates the Windows speaker layout.
+请选择虚拟播放音源；布局可先行配置。安装虚拟驱动后点击“刷新设备”。	Select a virtual playback source. Install the driver, then refresh devices.
+请选择虚拟播放音源。	Select a virtual playback source.
+请选择音源。	Select a playback source.
+已按扬声器位置匹配全部音源声道。	All source channels matched to speaker positions.
+只音箱没有匹配音源声道，请手动选择；不会自动补出中置或低音信号。	speakers have no source channel. Select channels manually; no center or LFE signal is synthesized.
+注意：	Warning: 
+ 的音源声道与音箱位置不符；若非有意交叉映射，请点击“匹配声道”，再应用配置。	 has a source channel that differs from its position. Enable auto-map and apply the preset unless this is intentional.
+已发现	Found
+个播放设备。选择布局，点击音箱，在右侧配置其设备和 L/R 输出。	playback devices. Select a layout and assign each speaker's device and L/R output.
+已切换为	Layout changed to
+；按实际音源重新匹配声道，保留输出设备、接口、增益和延迟。	; source channels remapped, output assignments, gain and delay preserved.
+配置已保存，等待后台服务应用…	Preset saved; waiting for the service…
+后台路由运行中；关闭界面不影响播放	Routing is running. Closing this window does not stop playback.
+服务未运行或正在重启；已保存的配置会在服务恢复后继续执行。	Service stopped or restarting. Saved routing resumes when it returns.
+服务尚未就绪。点击“启动服务 / 路由”；首次安装会请求管理员授权。	Service not ready. Click Start routing; installation may require administrator access.
+路由已停止	Routing stopped
+后台服务	Background service
+■ 停止测试	■ Stop test
+正在测试	Testing
+配置已保存：	Preset saved: 
+配置已载入；缺失设备保留为未连接状态，请检查后启动。	Preset loaded. Missing devices remain offline; check assignments before starting.
+ChannelBridge 配置|*.json	ChannelBridge preset|*.json
+环绕声配置.json	surround-preset.json
+界面演示 · 使用示例设备，尚未启动音频路由。	Preview · Sample devices; audio routing has not been started.
+演示虚拟音源（非设备检测结果）	Demo virtual source (sample device)
+演示 USB 声卡	Demo USB interface
+未分配设备	No output assigned
+未连接音源	No source connected
+音源 CH	Source CH
+延迟	Delay
+帧	frames
+麦克风延迟测量 · 三次中位数与补偿复测	Microphone latency · Three trials and verification
+麦克风Delay测量 · 三次中位数与补偿复测	Microphone latency · Three trials and verification
+应用并开始测量	Apply and measure
+停止测量	Stop measurement
+关闭	Close
+测量麦克风	Microphone
+将麦克风固定在听音位置，暂停其他声音，关闭麦克风回放/监听并保持音量不变。\n每只音箱初测 3 次取中位数，以最慢者为基准补偿，再复测 3 次。仅全部通过验证才自动保存。\n测量使用短扫频声（低音炮为低频扫频）；原延迟暂时归零。单只音箱三次极差须 ≤ 10 ms；各音箱复测均值及中位数极差须 ≤ 5 ms。	Keep the microphone at the listening position. Pause other audio, disable microphone monitoring and keep volume unchanged.\nMeasure each speaker three times, align to the slowest median, then verify three times. Save only after all checks pass.\nShort sweeps are used (low-frequency for the subwoofer). Initial delay is zero. Trial spread ≤ 10 ms; alignment ≤ 5 ms.
+仅在点击开始后采集麦克风；音频只在内存中分析，不保存录音。测量值包含声音传播和设备延迟，主要用于各音箱的相对对齐。	Recording starts only when you click Measure. Audio is analyzed in memory and never saved. Results include acoustic and device latency and are used for relative alignment.
+音箱	Speaker
+初测 1	Trial 1
+初测 2	Trial 2
+初测 3	Trial 3
+初测极差	Trial spread
+复测 1	Verify 1
+复测 2	Verify 2
+复测 3	Verify 3
+复测中位数	Verified median
+复测均值	Verified mean
+复测极差	Verified spread
+补偿 ms	Delay ms
+平均值	Mean
+中位数	Median
+验证	Validation
+未通过	Failed
+通过	Passed
+无效	Invalid
+匹配度	Confidence
+演示数据 · 非实际测量结果	Example data · Not measured results
+所有数值单位为 ms。悬停在单次测量格上可查看匹配度或失败原因。	All values in ms. Hover over a trial for confidence or failure details.
+未发现可用麦克风。连接麦克风后重新打开此窗口。	No active microphone found. Connect one and reopen this window.
+无法列出麦克风：	Unable to list microphones: 
+正在应用配置并准备后台测量；必要时会请求管理员授权…	Applying the preset and preparing measurement; administrator access may be requested…
+等待后台开始。请保持安静和麦克风位置不变。	Waiting for the service. Stay quiet and keep the microphone still.
+无法开始：	Unable to start: 
+正在停止录音与测试声，并恢复正常路由…	Stopping recording and test audio, then restoring routing…
+停止请求失败：	Unable to stop: 
+服务已重启，本次测量中断，未取得完整验证结果。请重新测量。	The service restarted and interrupted measurement. Please measure again.
+不要移动麦克风或调整音量；如需退出，请点击停止测量。	Do not move the microphone or change volume. Click Stop measurement to cancel.
+后台未返回测量结果，请检查麦克风权限或服务状态后重试。	No result from the service. Check microphone permissions and service status, then retry.
+读取测量状态失败：	Unable to read measurement status: 
+延迟测试成功	Latency test passed
+延迟测试及复测已通过，补偿已自动保存。\n\n是否关闭结果窗口？选择“否”可继续查看三次结果对比。	Measurement and verification passed. Compensation was saved automatically.\n\nClose the results window? Choose No to keep comparing the three trials.
+首次使用 · 安装播放音源	First run · Install a playback source
+未检测到默认播放音源 CABLE Input。\n\n请下载并安装 VB-CABLE 虚拟音频驱动。点击确定将打开 VB-Audio 官方下载页面；安装并按提示重启电脑后，回到软件点击“刷新设备”。	CABLE Input was not found.\n\nDownload and install the VB-CABLE virtual audio driver. Click OK to open the official VB-Audio download page. After installation and any required restart, click Refresh devices.
+无法打开浏览器，请访问：	Unable to open the browser. Visit:
+初测未通过稳定性验证：每只音箱必须有三次有效结果，极差 ≤ 10 ms，平均值与中位数差 ≤ 5 ms。请降低环境噪声或检查麦克风后重测。	Initial trials failed stability checks. Each speaker needs three valid trials, spread ≤ 10 ms and mean-to-median difference ≤ 5 ms. Reduce noise or check the microphone and retry.
+补偿后的三次复测不稳定，未保存补偿。	The verification trials were unstable. Compensation was not saved.
+测量/验证未通过，原补偿未改变：	Measurement or verification failed. Previous compensation is unchanged: 
+已取消测量，原补偿未改变。	Measurement cancelled. Previous compensation is unchanged.
+准备测量…	Preparing measurement…
+补偿复测	Verification
+初测	Initial measurement
+第 	Trial 
+ 次	
+验证通过，已自动应用补偿。复测平均延迟极差	Validation passed. Compensation applied. Verified mean spread
+ ms，中位数极差	 ms, median spread
+ ms（均 ≤ 5 ms）。	 ms (both ≤ 5 ms).
+复测未对齐：平均延迟极差	Verification not aligned: mean spread
+ ms，要求均 ≤ 5 ms。未保存补偿。	 ms. Both must be ≤ 5 ms. Compensation was not saved.
+配置过大。	Preset is too large.
+配置不完整。	Preset is incomplete.
+配置为空。	Preset is empty.
+配置读取失败，保留当前运行配置：	Unable to read preset; keeping current routing: 
+服务配置失败：	Service configuration failed: 
+服务安装未完成，请查看管理员窗口的错误提示。	Service installation failed. See the administrator window for details.
+等待设备 / 音频服务恢复，自动重试中	Waiting for devices or Windows Audio; retrying automatically
+等待原音源设备连接	Waiting for the original source device
+设备读取失败：	Unable to enumerate devices: 
+所选音源设备未连接。	Selected source device is offline.
+无法读取保存的配置。	Unable to read the saved preset.
+测量期间配置已改变，未覆盖新配置。	The preset changed during measurement; the new preset was not overwritten.
+测量期间音源格式已改变，未保存补偿。	Source format changed during measurement; compensation was not saved.
+请选择可用麦克风。	Select an active microphone.
+至少需要两只已配置且非静音的音箱。	At least two assigned, unmuted speakers are required.
+测量需要各音箱使用独立音源声道，不能重复映射同一音源。	Each measured speaker needs a distinct source channel.
+没有收到录音数据。	No recorded samples received.
+不支持的麦克风/参考声道格式。	Unsupported microphone or reference format.
+音频设备未提供可靠时间戳，不能计算延迟。	The audio device did not provide reliable timestamps; latency cannot be calculated.
+录音发生丢帧或不连续，请关闭高负载应用后重测。	Recording dropped samples. Close high-load applications and retry.
+设备音频时间戳漂移超过 5 ms，测量无效。	Audio timestamp drift exceeded 5 ms; measurement is invalid.
+录音超出测量时限。	Recording exceeded the measurement time limit.
+测量需要浮点混音格式。	Measurement requires a floating-point mix format.
+到达时间不在有效测量范围 0～2000 ms 内。	Arrival time is outside the valid 0–2000 ms range.
+录音过短或数据无效。	Recording is too short or invalid.
+麦克风削波，请降低输入增益。	Microphone clipping detected. Reduce input gain.
+未可靠检测到测试声（匹配度	Test signal not detected reliably (confidence
+），请检查音量、麦克风位置及环境噪声。	). Check volume, microphone position and background noise.
+检测到多个接近的到达峰，反射或干扰过强；未采用不确定结果。	Multiple similar arrival peaks detected. Reflections or interference are too strong; ambiguous results were rejected.
+需要的补偿超过 500 ms，未应用。请检查异常设备。	Required compensation exceeds 500 ms. Check the affected device; no change was applied.
+测量线程未按时停止。	Measurement did not stop in time.
+测量请求过大。	Measurement request is too large.
+测试请求过大。	Test request is too large.
+测试失败：	Test failed: 
+另一次测量正在进行。	Another measurement is in progress.
+麦克风测量进行中，请先停止测量。	Stop microphone measurement before running a speaker test.
+模拟服务不采集麦克风。	The simulated service does not record microphones.
+配置已变化，请重新开始测量。	The preset changed. Restart measurement.
+缺少测量配置。	Measurement preset is missing.
+没有可测试音箱：请分配音源声道和输出设备，并取消静音。	No speakers to test. Assign source channels and outputs, and unmute speakers.
+测试设备未连接。	Test device is offline.
+不能向音源回接测试音。	Test audio cannot be routed back to the source.
+测试音箱不在当前布局中。	Test speaker is not in the current layout.
+测试配置包含重复的设备 L/R 输出。	The test preset assigns an output channel more than once.
+多个音箱占用了同一设备的同一输出侧。请修改右侧“输出接口”，每个 L/R 只分配一个音箱。	Multiple speakers share the same device output. Assign each L/R output to only one speaker.
+音源不能同时作为输出设备，否则会产生反馈。	The source cannot also be an output; this would cause feedback.
+音源不能同时作为目标设备，否则会产生反馈。	The source cannot also be a destination; this would cause feedback.
+ 的输出设备已断开或不可用，请重新选择。	 output is offline or unavailable. Select another device.
+ 的音源声道不存在，请重新匹配。	 source channel does not exist. Remap channels.
+请至少为一个未静音音箱选择音源声道和输出设备。	Assign a source channel and output to at least one unmuted speaker.
+音箱配置重复或超出 8 声道。	Speaker settings are duplicated or exceed eight channels.
+音箱配置包含无效的声道、增益或延迟。	Speaker settings contain an invalid channel, gain or delay.
+音箱列表与布局不符。	The speaker list does not match the layout.
+不支持此配置版本。	Unsupported preset version.
+未知声道布局：	Unknown speaker layout: 
+不支持此旧配置。	Unsupported legacy preset.
+旧配置为空。	Legacy preset is empty.
+旧配置音量无效。	Legacy preset gain is invalid.
+旧配置使用了额外输出，请在新版中手动设置。	The legacy preset uses extra outputs. Configure them manually.
+至少选择一个输出设备。	Select at least one output device.
+音源设备未连接。	Source device is offline.
+音源停止捕获。	Source capture stopped.
+输出设备停止播放。	Output playback stopped.
+音量或延迟超出范围。	Gain or delay is out of range.
+每个输出设备只能使用一行，请在同一行设置左右声道。	Use one row per output device, with both channels on that row.
+映射超出音源实际声道数，请刷新设备并重新选择。	Mapping exceeds the source channel count. Refresh devices and select again.
+ 不是两声道设备。	 is not a stereo device.
+不支持音源格式：	Unsupported source format: 
+。请在 Windows 中设置 16/24/32 位 PCM 或 32 位浮点。	. Choose 16/24/32-bit PCM or 32-bit float in Windows.
+管理员设置程序未返回结果，配置未确认应用。	The administrator helper returned no result; applying the preset was not confirmed.
+无法设置 Windows 音源声道模式：	Unable to set the Windows source layout: 
+Windows 未接受所选声道模式：	Windows rejected the selected speaker layout: 
+Windows 声道设置失败。	Windows speaker configuration failed.
+恢复 Windows 音频设置失败。	Unable to restore Windows audio settings.
+；恢复旧格式失败：	; restoring the original format failed: 
