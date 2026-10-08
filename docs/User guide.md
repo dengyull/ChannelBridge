@@ -51,3 +51,21 @@ Enable “Low latency (50ms buffer)” at the top, then apply the configuration.
 | Low latency | 25ms (poll at roughly half the actual buffer duration) | 50ms + speaker compensation | 20ms |
 
 50ms is the routing queue's base target, not end-to-end latency. Drivers may adjust actual buffer sizes. VB-CABLE internal buffering, Windows mixing, device latency and acoustic travel time still contribute. This option does not change VB-CABLE's global internal buffer settings. Recalibrate speaker delays after switching modes. If audio breaks up, turn low latency off and apply the configuration. Advanced → Audio buffers in the top-right menu accepts individual capture/output values of 10–500ms and routing values of 10–1000ms. Confirm, then Apply in the main window. Reset restores 25/50/20ms. Legacy 40ms presets migrate to 50ms; explicit custom values are preserved. Smaller values are more prone to crackling and may not be supported by every driver.
+
+## Native multichannel outputs and quick mapping
+
+Route a 7.1 source to a native 5.1 device plus a stereo device without upmixing. Device selection shows the current Windows driver channel count and sample rate, not maximum advertised capability. Configure the desired layout in Windows/the device driver first.
+
+Select an output device and enable **Use device channels** to expose its speaker positions (FL, FR, FC, LFE, surrounds, etc.). Off sends stereo L/R only. Mode applies to every speaker assigned to that device.
+
+Selecting a multichannel device or enabling native mode offers a quick-map confirmation; **Quick map…** also opens it. The preview lists target positions, assignments that would be replaced, and incompatible old assignments that would be removed. Confirm, then click **Apply**. Unmatched positions on other devices remain available for the extra stereo pair. Side and rear positions are matched exactly, never interchanged in a 7.1 quick map.
+
+Per-channel gain, delay, mute, test playback and microphone calibration follow the same mapping. Unassigned channels remain silent. Unknown driver positions require manual CH-number assignment. Changed driver layouts block stale mappings until refreshed and remapped. The stream preserves the Windows channel mask; driver effects/remixing and physical connections can still affect playback. Stereo mode does not disable a driver's own upmixing.
+
+Saved profiles use schema 3 and accept older profiles on import; older software cannot read schema 3. Back up profiles before upgrading. Independent device clocks still need compensation and cannot guarantee hardware-level synchronization. Live driver checks use zero output gain; verify actual speaker wiring using test playback.
+
+## Background service priority
+
+Open **Advanced settings → Process priority (background service)** and choose Low, Below normal, Normal (default), Above normal or High. Click **Apply** to change the service process priority. The UI process is unaffected. The selection is saved with the preset and restored when the service or computer restarts. Older presets use Normal.
+
+Priority affects scheduling under CPU contention. It does not change audio buffer values or guarantee crackle-free playback. Start with Normal; try Above normal if needed. Realtime priority is not offered. If applying priority fails, the error is reported and the previous running configuration is retained.

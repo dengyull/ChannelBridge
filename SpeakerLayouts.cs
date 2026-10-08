@@ -13,6 +13,9 @@ public sealed class SpeakerSetting
     public int SourceChannel { get; set; } = -1;
     public string DeviceId { get; set; } = "";
     public int Side { get; set; }
+    public bool NativeOutput { get; set; }
+    public int? DeviceChannelMask { get; set; }
+    public int? DeviceChannels { get; set; }
     public float GainDb { get; set; } = -2.5f;
     public int DelayMs { get; set; }
     public bool Muted { get; set; }
@@ -21,12 +24,13 @@ public sealed class SpeakerSetting
 }
 public sealed class SurroundProfile
 {
-    public int Version { get; set; } = 2;
+    public int Version { get; set; } = 3;
     public string SourceId { get; set; } = "";
     public string LayoutId { get; set; } = "5.1";
     public List<SpeakerSetting> Speakers { get; set; } = new();
     public bool AutoMatchSource { get; set; } = true;
     public bool FollowSourceVolume { get; set; } = true;
+    public string ServicePriority { get; set; } = "Normal";
     public int BufferMs { get; set; } = 80;
     public int? CaptureBufferMs { get; set; }
     public int? OutputBufferMs { get; set; }
@@ -97,27 +101,63 @@ public static class SpeakerLayouts
         ValidateSettings(speakers);
         var assigned = speakers.Where(s => s.DeviceId.Length > 0).ToArray();
         if (assigned.GroupBy(s => (s.DeviceId, s.Side)).Any(g => g.Count() > 1))
-            throw new InvalidOperationException("多个音箱占用了同一设备的同一输出侧。请修改右侧“输出接口”，每个 L/R 只分配一个音箱。");
+            throw new InvalidOperationException("多个音箱占用了同一设备的同一输出声道。请修改右侧“输出接口”，每个设备声道只分配一个音箱。");
         foreach (var s in assigned)
         {
             if (s.DeviceId == source.Id) throw new InvalidOperationException("音源不能同时作为输出设备，否则会产生反馈。");
             var d = devices.FirstOrDefault(d => d.Id == s.DeviceId);
-            if (d == null || d.Channels < 2) throw new InvalidOperationException($"{Role(s.Role).Name} 的输出设备已断开或不可用，请重新选择。");
+            if (d == null || d.Channels < 1) throw new InvalidOperationException($"{Role(s.Role).Name} 的输出设备已断开或不可用，请重新选择。");
+            ValidateOutput(s, d);
             if (s.SourceChannel >= source.Channels) throw new InvalidOperationException($"{Role(s.Role).Name} 的音源声道不存在，请重新匹配。");
         }
         var active = assigned.Where(s => s.SourceChannel >= 0 && !s.Muted).ToArray();
         if (active.Length == 0) throw new InvalidOperationException("请至少为一个未静音音箱选择音源声道和输出设备。");
         return active.GroupBy(s => s.DeviceId).Select(g => {
+            if (assigned.Where(s => s.DeviceId == g.Key).Select(s => s.NativeOutput).Distinct().Count() != 1)
+                throw new InvalidOperationException("同一设备必须使用相同的输出模式。");
+            var device = devices.Single(d => d.Id == g.Key);
+            bool native = g.First().NativeOutput;
+            int count = native ? device.Channels : 2;
+            var channels = Enumerable.Range(0, count).Select(i => {
+                var speaker = g.FirstOrDefault(s => s.Side == i);
+                return new OutputChannel(speaker?.SourceChannel ?? -1, speaker?.LinearGain ?? 0, speaker?.DelayMs ?? 0);
+            }).ToArray();
             var l = g.FirstOrDefault(s => s.Side == 0); var r = g.FirstOrDefault(s => s.Side == 1);
-            return new Route(g.Key, l?.SourceChannel ?? -1, r?.SourceChannel ?? -1, l?.LinearGain ?? 0, l?.DelayMs ?? 0, r?.LinearGain ?? 0, r?.DelayMs ?? 0);
+            return new Route(g.Key, l?.SourceChannel ?? -1, r?.SourceChannel ?? -1, l?.LinearGain ?? 0, l?.DelayMs ?? 0, r?.LinearGain ?? 0, r?.DelayMs ?? 0, channels, native, native ? device.Mask : 0);
         }).ToList();
+    }
+    public static void ValidateOutput(SpeakerSetting s, Endpoint device)
+    {
+        int count = s.NativeOutput ? device.Channels : 2;
+        if (count is < 1 or > 32 || s.Side < 0 || s.Side >= count)
+            throw new InvalidOperationException("输出声道超出设备或立体声模式范围，请重新映射。");
+        if (s.NativeOutput && (s.DeviceChannelMask is int mask && mask != device.Mask || s.DeviceChannels is int channels && channels != device.Channels))
+            throw new InvalidOperationException("设备声道布局已变化，请刷新设备并重新映射。");
+    }
+    public static List<(SpeakerSetting Speaker, int Channel)> QuickMapTargets(IReadOnlyList<SpeakerSetting> speakers, Endpoint device)
+    {
+        if (device.Channels is < 1 or > 32) throw new InvalidOperationException("设备输出声道数必须为 1–32。");
+        var roles = SourceRoles(device);
+        return speakers.Select(s => (Speaker: s, Channel: Array.IndexOf(roles, s.Role))).Where(x => x.Channel >= 0).ToList();
+    }
+    public static void ApplyQuickMap(IReadOnlyList<SpeakerSetting> speakers, Endpoint device)
+    {
+        var targets = QuickMapTargets(speakers, device);
+        if (targets.Count == 0) throw new InvalidOperationException("驱动未报告可匹配的位置，请手动映射输出声道。");
+        foreach (var s in speakers.Where(s => s.DeviceId == device.Id && targets.All(t => t.Speaker != s)))
+        { s.DeviceId = ""; s.NativeOutput = false; s.DeviceChannelMask = null; s.DeviceChannels = null; }
+        foreach (var (s, channel) in targets)
+        {
+            s.DeviceId = device.Id; s.Side = channel; s.NativeOutput = true;
+            s.DeviceChannelMask = device.Mask; s.DeviceChannels = device.Channels;
+        }
     }
     public static void ValidateSettings(IReadOnlyList<SpeakerSetting> speakers)
     {
         if (speakers.Count > 8 || speakers.Any(s => s == null) || speakers.Select(s => s.Role).Distinct().Count() != speakers.Count)
             throw new InvalidOperationException("音箱配置重复或超出 8 声道。");
         foreach (var s in speakers)
-            if (!Roles.Any(r => r.Id == s.Role) || s.SourceChannel < -1 || s.SourceChannel > 63 || s.DeviceId == null || s.Side is not (0 or 1) ||
+            if (!Roles.Any(r => r.Id == s.Role) || s.SourceChannel < -1 || s.SourceChannel > 63 || s.DeviceId == null || s.Side is < 0 or > 31 ||
                 !float.IsFinite(s.GainDb) || s.GainDb < -60 || s.GainDb > 6 || s.DelayMs < 0 || s.DelayMs > 500)
                 throw new InvalidOperationException("音箱配置包含无效的声道、增益或延迟。");
     }
@@ -127,7 +167,9 @@ public static class SpeakerLayouts
         if (document.RootElement.TryGetProperty("Version", out _))
         {
             var p = JsonSerializer.Deserialize<SurroundProfile>(json) ?? throw new InvalidOperationException("配置为空。");
-            if (p.Version != 2 || p.Speakers == null || p.SourceId == null) throw new InvalidOperationException("不支持此配置版本。");
+            if (p.Version is not (2 or 3) || p.Speakers == null || p.SourceId == null) throw new InvalidOperationException("不支持此配置版本。");
+            p.Version = 3;
+            ServicePriority.Parse(p.ServicePriority);
             var buffers = p.Buffers; buffers.Validate(); p.BufferMs = buffers.QueueMs; p.CaptureBufferMs = buffers.CaptureMs; p.OutputBufferMs = buffers.OutputMs;
             var layout = Get(p.LayoutId); ValidateSettings(p.Speakers);
             if (!p.Speakers.Select(s => s.Role).Order().SequenceEqual(layout.Roles.Order())) throw new InvalidOperationException("音箱列表与布局不符。");

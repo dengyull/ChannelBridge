@@ -2,9 +2,9 @@
 
 [简体中文](README.md) · [Latest release](../../releases/latest) · [User guide](docs/User%20guide.md)
 
-**Route one multichannel playback source to multiple stereo audio devices on Windows.**
+**Route one multichannel playback source to multiple stereo or native multichannel audio devices on Windows.**
 
-Assign physical devices and L/R outputs on a visual speaker map. A Windows service handles playback independently of the configuration UI.
+Assign physical devices and output channels on a visual speaker map. A Windows service handles playback independently of the configuration UI.
 
 ![English interface with sample devices](docs/images/main-en.png)
 
@@ -12,12 +12,20 @@ Assign physical devices and L/R outputs on a visual speaker map. A Windows servi
 
 - 13 layouts from 2.0 through 7.1, including side/rear 5.1 variants.
 - Per-speaker output assignment, gain, delay and mute.
+- Native Windows device channels or stereo-only output, including 7.1 routed to a 5.1 device plus a stereo pair.
+- Quick mapping uses reported speaker positions and previews replacements before confirmation.
 - Automatic source-channel matching using the actual Windows speaker mask.
 - Applying a preset also configures the virtual source's Windows speaker layout.
 - Automatic service startup, saved run/stop intent, device reconnect retry.
 - Source volume/mute following, individual and sequential speaker tests.
 - Three microphone trials, median-based compensation, then three verification trials.
 - Live Chinese/English switching with a remembered language choice.
+
+## What's new in v1.1.0
+
+- Native multichannel outputs and quick mapping, including a 5.1 device plus stereo for 7.1 playback.
+- **Advanced settings → Process priority (background service)**: choose a level and click **Apply**. The service restores it after restarting; default is Normal.
+- New presets use schema version 3; older presets can be imported. See [release notes](docs/releases/v1.1.0.md).
 
 ## What's new in v1.0.1
 

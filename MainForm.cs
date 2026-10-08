@@ -10,9 +10,11 @@ public sealed class MainForm : LanguageForm
     readonly NumericUpDown gain = new() { DecimalPlaces = 1, Increment = .5m, Minimum = -60, Maximum = 6, Width = 136 };
     readonly NumericUpDown delay = new() { Maximum = 500, Width = 136 };
     readonly CheckBox mute = new() { Text = "静音此音箱", AutoSize = true };
+    readonly CheckBox nativeOutput = new() { Text = "使用设备多声道", AutoSize = true };
     readonly CheckBox lowLatency = new() { Text = "低延迟（缓冲 50ms）", AutoSize = true, Margin = new(6, 8, 8, 3) };
     readonly ToolTip latencyTip = new();
     BufferSettings buffers = BufferSettings.Standard;
+    string servicePriority = "Normal";
     readonly ContextMenuStrip advancedMenu = new();
     readonly Button advanced;
     readonly Label info = Label("", 13), status = Label("", 13), summary = Label("", 13), detail = Label("", 13), speakerTitle = Label("", 24, true);
@@ -27,6 +29,7 @@ public sealed class MainForm : LanguageForm
     bool fittingPage, fittingInspector;
     readonly Button run, stop, test, testAll, autoMatch, volumeFollow, refresh, save, load;
     readonly Button systemSound;
+    readonly Button quickMap;
     bool automaticSource = true, followVolume = true;
     DateTime nextSourceRefresh;
     readonly System.Windows.Forms.Timer timer = new() { Interval = 1000 };
@@ -77,6 +80,8 @@ public sealed class MainForm : LanguageForm
         Place(Caption("增益 / dB"), 18, 358); Place(Caption("延迟补偿 / ms"), 185, 358); Place(gain, 22, 386); Place(delay, 189, 386); Place(mute, 22, 435);
         test = Button("▶ 播放测试音频", () => RequestTest(false)); Place(test, 22, 473, 310);
         detail.AutoSize = false; detail.Size = new(310, 96); detail.ForeColor = MutedInk; Place(detail, 22, 527);
+        Place(nativeOutput, 22, 277);
+        quickMap = Button("快速映射…", QuickMapDevice); Place(quickMap, 22, 313, 310);
         run = Button("▶ 启动服务 / 路由", Start); run.BackColor = Blue; run.ForeColor = Color.White; run.FlatAppearance.BorderSize = 0;
         stop = Button("■ 停止路由", Stop); stop.Enabled = false; save = Button("保存配置…", SaveProfile); load = Button("载入配置…", LoadProfile);
         testAll = Button("▶ 测试配置", () => RequestTest(true));
@@ -89,7 +94,8 @@ public sealed class MainForm : LanguageForm
         source.SelectedIndexChanged += (_, _) => { if (!loading) MatchSource(); };
         speakerSelect.SelectedIndexChanged += (_, _) => { if (!loading && speakerSelect.SelectedItem is SpeakerChoice c) SelectSpeaker(c.Id); };
         map.SpeakerSelected += SelectSpeaker;
-        sourceChannel.SelectedIndexChanged += (_, _) => EditSelected(); destination.SelectedIndexChanged += (_, _) => EditSelected(); outputSide.SelectedIndexChanged += (_, _) => EditSelected();
+        sourceChannel.SelectedIndexChanged += (_, _) => EditSelected(); destination.SelectedIndexChanged += (_, _) => ChangeDestination(); outputSide.SelectedIndexChanged += (_, _) => EditSelected();
+        nativeOutput.CheckedChanged += (_, _) => ChangeOutputMode();
         gain.ValueChanged += (_, _) => EditSelected(); delay.ValueChanged += (_, _) => EditSelected(); mute.CheckedChanged += (_, _) => EditSelected();
         timer.Tick += (_, _) => UpdateMeters(); timer.Start();
         FormClosing += (_, _) => { timer.Dispose(); latencyTip.Dispose(); advancedMenu.Dispose(); };
@@ -111,6 +117,17 @@ public sealed class MainForm : LanguageForm
     {
         advancedMenu.Items.Clear();
         advancedMenu.Items.Add(UiLanguage.T("音频缓冲…"), null, (_, _) => EditBuffers());
+        var priorityMenu = new ToolStripMenuItem(UiLanguage.T("程序优先级（后台服务）"));
+        foreach (var option in ServicePriority.Options)
+        {
+            var item = new ToolStripMenuItem(UiLanguage.T(option.Label)) { Checked = servicePriority == option.Id };
+            item.Click += (_, _) => {
+                servicePriority = option.Id;
+                status.Text = "后台服务优先级将在应用配置后生效，并在服务重启后保留。";
+            };
+            priorityMenu.DropDownItems.Add(item);
+        }
+        advancedMenu.Items.Add(priorityMenu);
         advancedMenu.Show(advanced, new Point(0, advanced.Height));
     }
     void EditBuffers()
@@ -160,7 +177,7 @@ public sealed class MainForm : LanguageForm
         fittingInspector = true;
         inspector.SuspendLayout();
         var scroll = inspector.AutoScrollPosition;
-        int[] ys = { 12, 36, 0, 76, 95, 131, 150, 186, 205, 241, 241, 260, 260, 298, 294, 333 };
+        int[] ys = { 12, 36, 0, 76, 95, 131, 150, 186, 205, 241, 241, 260, 260, 298, 294, 333, 183, 219 };
         int usable = Math.Max(Px(230), inspector.ClientSize.Width - Px(32));
         for (int i = 0; i < inspectorSpec.Count; i++)
         {
@@ -168,6 +185,7 @@ public sealed class MainForm : LanguageForm
             c.Visible = !(compact && i == 2) && !(automaticSource && (i == 3 || i == 4));
             int x = compact ? 16 : item.X;
             int y = compact ? ys[i] : item.Y;
+            if (i >= 7 && i <= 15) y += 72;
             if (automaticSource && i >= 5) y -= compact ? 55 : 74;
             if (compact && (i == 10 || i == 12)) x = 16 + (int)(usable / (DeviceDpi / 96f) / 2) + 5;
             if (compact && i == 14) x = 148;
@@ -176,7 +194,7 @@ public sealed class MainForm : LanguageForm
             if (compact && i == 14) c.Width = usable - Px(132);
             if (i == 11 || i == 12) c.Width = compact ? usable / 2 - Px(5) : Px(136);
             if (i == 14) c.Height = Px(32);
-            if (i == 15) { c.Width = usable; c.Height = Px(UiLanguage.English ? 132 : 76); }
+            if (i == 15) { c.Width = usable; c.Height = Px(UiLanguage.English ? 176 : 108); }
         }
         inspector.ResumeLayout(true);
         fittingInspector = false;
@@ -247,7 +265,13 @@ public sealed class MainForm : LanguageForm
         if (mismatched.Length > 0) info.Text = "注意：" + string.Join("、", mismatched) + " 的音源声道与音箱位置不符；若非有意交叉映射，请点击“匹配声道”，再应用配置。";
         summary.Text = $"{CurrentLayout.Name}    ·    {speakers.Count} 只音箱    ·    {ready} 只已就绪    ·    {speakers.Where(s => s.DeviceId.Length > 0).Select(s => s.DeviceId).Distinct().Count()} 台输出设备\n蓝框为选中音箱；图标下显示独立增益。点击音箱或使用右侧下拉框选择。"; RenderInspector();
     }
-    bool IsReady(SpeakerSetting s) => s.SourceChannel >= 0 && s.SourceChannel < (Source?.Channels ?? 0) && !s.Muted && s.DeviceId != Source?.Id && devices.Any(d => d.Id == s.DeviceId && d.Channels >= 2) && !speakers.Any(x => x != s && x.DeviceId == s.DeviceId && x.Side == s.Side);
+    bool IsReady(SpeakerSetting s) => s.SourceChannel >= 0 && s.SourceChannel < (Source?.Channels ?? 0) && !s.Muted && s.DeviceId != Source?.Id && OutputReady(s) && !speakers.Any(x => x != s && x.DeviceId == s.DeviceId && x.Side == s.Side);
+    bool OutputReady(SpeakerSetting s)
+    {
+        var device = devices.FirstOrDefault(d => d.Id == s.DeviceId);
+        if (device == null) return false;
+        try { SpeakerLayouts.ValidateOutput(s, device); return true; } catch { return false; }
+    }
     void RenderInspector()
     {
         bool prior = loading; loading = true;
@@ -261,28 +285,80 @@ public sealed class MainForm : LanguageForm
             if (v.SourceChannel >= (Source?.Channels ?? 0)) sourceChannel.Items.Add(new ChannelChoice(v.SourceChannel, $"[不可用] 原声道 {v.SourceChannel + 1}"));
             sourceChannel.SelectedItem = sourceChannel.Items.Cast<ChannelChoice>().FirstOrDefault(c => c.Index == v.SourceChannel);
             destination.Items.Clear(); destination.Items.Add(new DeviceChoice("", "— 未分配设备 —"));
-            destination.Items.AddRange(devices.Where(d => d.Channels >= 2 && d.Id != Source?.Id).Select(d => new DeviceChoice(d.Id, d.Name)).Cast<object>().ToArray());
+            destination.Items.AddRange(devices.Where(d => d.Channels >= 1 && d.Id != Source?.Id).Select(d => new DeviceChoice(d.Id, d.ToString())).Cast<object>().ToArray());
             if (v.DeviceId.Length > 0 && !destination.Items.Cast<DeviceChoice>().Any(d => d.Id == v.DeviceId)) destination.Items.Add(new DeviceChoice(v.DeviceId, v.DeviceId == Source?.Id ? "[无效] 不能回接音源" : "[未连接] 原输出设备"));
             destination.SelectedItem = destination.Items.Cast<DeviceChoice>().FirstOrDefault(d => d.Id == v.DeviceId);
-            outputSide.SelectedIndex = v.Side; gain.Value = (decimal)v.GainDb; delay.Value = v.DelayMs; mute.Checked = v.Muted; UpdateDetail();
+            var device = devices.FirstOrDefault(d => d.Id == v.DeviceId);
+            nativeOutput.Enabled = device != null;
+            quickMap.Enabled = device != null;
+            nativeOutput.Checked = v.NativeOutput;
+            outputSide.Items.Clear();
+            var names = v.NativeOutput && device != null ? SpeakerLayouts.ChannelNames(device) : new[] { "L · 设备左声道", "R · 设备右声道" };
+            outputSide.Items.AddRange(names.Select((name, index) => new ChannelChoice(index, name)).Cast<object>().ToArray());
+            if (v.Side >= names.Length) outputSide.Items.Add(new ChannelChoice(v.Side, $"[不可用] 原声道 {v.Side + 1}"));
+            outputSide.SelectedItem = outputSide.Items.Cast<ChannelChoice>().FirstOrDefault(c => c.Index == v.Side);
+            gain.Value = (decimal)v.GainDb; delay.Value = v.DelayMs; mute.Checked = v.Muted; UpdateDetail();
         }
         finally { loading = prior; }
     }
     void EditSelected()
     {
         if (loading || Selected is not SpeakerSetting s) return; EndTest();
-        s.SourceChannel = (sourceChannel.SelectedItem as ChannelChoice)?.Index ?? -1; s.DeviceId = (destination.SelectedItem as DeviceChoice)?.Id ?? "";
-        s.Side = Math.Max(0, outputSide.SelectedIndex); s.GainDb = (float)gain.Value; s.DelayMs = (int)delay.Value; s.Muted = mute.Checked; Render();
+        s.SourceChannel = (sourceChannel.SelectedItem as ChannelChoice)?.Index ?? -1;
+        s.Side = (outputSide.SelectedItem as ChannelChoice)?.Index ?? 0;
+        if (s.NativeOutput && devices.FirstOrDefault(d => d.Id == s.DeviceId) is { } device) { s.DeviceChannelMask = device.Mask; s.DeviceChannels = device.Channels; }
+        s.GainDb = (float)gain.Value; s.DelayMs = (int)delay.Value; s.Muted = mute.Checked; Render();
+    }
+    void ChangeDestination()
+    {
+        if (loading || Selected is not SpeakerSetting s) return;
+        s.DeviceId = (destination.SelectedItem as DeviceChoice)?.Id ?? "";
+        s.NativeOutput = speakers.FirstOrDefault(x => x != s && x.DeviceId == s.DeviceId)?.NativeOutput ?? false;
+        if (devices.FirstOrDefault(d => d.Id == s.DeviceId) is { } device)
+        {
+            s.DeviceChannelMask = device.Mask; s.DeviceChannels = device.Channels;
+            int matched = s.NativeOutput ? Array.IndexOf(SpeakerLayouts.SourceRoles(device), s.Role) : -1;
+            s.Side = matched >= 0 ? matched : s.Side < (s.NativeOutput ? device.Channels : 2) ? s.Side : 0;
+        }
+        Render();
+        if (!preview && devices.FirstOrDefault(d => d.Id == s.DeviceId)?.Channels > 2) QuickMapDevice();
+    }
+    void ChangeOutputMode()
+    {
+        if (loading || Selected is not SpeakerSetting selected || devices.FirstOrDefault(d => d.Id == selected.DeviceId) is not { } device) return;
+        foreach (var s in speakers.Where(s => s.DeviceId == selected.DeviceId))
+        {
+            s.NativeOutput = nativeOutput.Checked; s.DeviceChannelMask = device.Mask; s.DeviceChannels = device.Channels;
+        }
+        status.Text = "输出模式对同一设备的所有音箱生效；请检查各声道后应用配置。";
+        Render();
+        if (!preview && selected.NativeOutput) QuickMapDevice();
+    }
+    void QuickMapDevice()
+    {
+        if (Selected is not SpeakerSetting selected || devices.FirstOrDefault(d => d.Id == selected.DeviceId) is not { } device) return;
+        var targets = SpeakerLayouts.QuickMapTargets(speakers, device);
+        if (targets.Count == 0) { UiMessage.Show(this, "驱动未报告可匹配的位置，请手动映射输出声道。"); return; }
+        string Describe(SpeakerSetting s) => s.Role + " · " + UiLanguage.T(SpeakerLayouts.Role(s.Role).Name);
+        string mapping = string.Join("\n", targets.Select(t => $"CH{t.Channel + 1} → {Describe(t.Speaker)}"));
+        var replaced = targets.Where(t => t.Speaker.DeviceId.Length > 0 && t.Speaker.DeviceId != device.Id).Select(t => Describe(t.Speaker));
+        var removed = speakers.Where(s => s.DeviceId == device.Id && targets.All(t => t.Speaker != s)).Select(Describe);
+        string message = device.Name + "\n\n" + UiLanguage.T("是否按设备声道位置快速映射？") + "\n" + mapping;
+        if (replaced.Any()) message += "\n\n" + UiLanguage.T("将替换这些音箱的原设备：") + string.Join(", ", replaced);
+        if (removed.Any()) message += "\n\n" + UiLanguage.T("将解除该设备上无法匹配的位置：") + string.Join(", ", removed);
+        message += "\n\n" + UiLanguage.T("其他设备上未匹配的位置将保留。确认后仍需点击“应用配置”。");
+        if (UiMessage.Show(this, message, "快速映射", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        SpeakerLayouts.ApplyQuickMap(speakers, device); Render();
     }
     void UpdateDetail()
     {
         if (Selected is not SpeakerSetting s) return;
         bool conflict = s.DeviceId.Length > 0 && speakers.Any(x => x != s && x.DeviceId == s.DeviceId && x.Side == s.Side);
-        detail.Text = (conflict ? "输出冲突：另一只音箱占用了相同的 L/R。" : IsReady(s) ? "连接已就绪。" : "请检查音源和输出设备。") + "\n测试使用当前预设的增益与延迟，跳过静音音箱。\n测试期间暂停路由，结束后自动恢复。";
+        detail.Text = (conflict ? "输出冲突：另一只音箱占用了相同的设备声道。" : IsReady(s) ? "连接已就绪。" : "请检查音源、输出声道和设备布局。") + "\n" + (s.NativeOutput ? "当前发送设备多声道。" : "当前仅发送立体声。") + "\n测试使用当前预设的增益与延迟，跳过静音音箱。\n测试期间暂停路由，结束后自动恢复。";
         detail.ForeColor = conflict ? Color.FromArgb(190, 76, 49) : MutedInk;
     }
     void SetRunning(bool v) { stop.Enabled = v; }
-    SurroundProfile Draft() => new() { SourceId = Source?.Id ?? "", LayoutId = CurrentLayout.Id, Speakers = speakers, AutoMatchSource = automaticSource, FollowSourceVolume = followVolume, BufferMs = buffers.QueueMs, CaptureBufferMs = buffers.CaptureMs, OutputBufferMs = buffers.OutputMs };
+    SurroundProfile Draft() => new() { SourceId = Source?.Id ?? "", LayoutId = CurrentLayout.Id, Speakers = speakers, AutoMatchSource = automaticSource, FollowSourceVolume = followVolume, ServicePriority = servicePriority, BufferMs = buffers.QueueMs, CaptureBufferMs = buffers.CaptureMs, OutputBufferMs = buffers.OutputMs };
     async void ServiceAction(Action action)
     {
         if (serviceBusy || preview) return;
@@ -366,7 +442,7 @@ public sealed class MainForm : LanguageForm
         try
         {
             layout.SelectedItem = SpeakerLayouts.Get(p.LayoutId); speakers = p.Speakers; selectedRole = speakers[0].Role;
-            buffers = p.Buffers; lowLatency.Checked = buffers != BufferSettings.Standard; RefreshBufferLabel();
+            servicePriority = p.ServicePriority; buffers = p.Buffers; lowLatency.Checked = buffers != BufferSettings.Standard; RefreshBufferLabel();
             var input = devices.FirstOrDefault(d => d.Id == p.SourceId);
             if (input == null && p.SourceId.Length > 0) { input = new Endpoint(p.SourceId, "[未连接] 原音源", 0, 0, 0); source.Items.Add(input); }
             source.SelectedItem = input;
@@ -390,7 +466,7 @@ public sealed class MainForm : LanguageForm
         try
         {
             layout.SelectedItem = SpeakerLayouts.Get(p.LayoutId); speakers = p.Speakers; selectedRole = speakers[0].Role;
-            buffers = p.Buffers; lowLatency.Checked = buffers != BufferSettings.Standard; RefreshBufferLabel();
+            servicePriority = p.ServicePriority; buffers = p.Buffers; lowLatency.Checked = buffers != BufferSettings.Standard; RefreshBufferLabel();
             var input = devices.FirstOrDefault(d => d.Id == p.SourceId);
             if (input == null && p.SourceId.Length > 0) { input = new Endpoint(p.SourceId, "[未连接] 原音源，请重新选择", 0, 0, 0); source.Items.Add(input); } source.SelectedItem = input;
         }
@@ -462,9 +538,37 @@ public sealed class MainForm : LanguageForm
         rear = speakers.Single(s => s.Role == "BL");
         if (rear.SourceChannel != 4 || rear.GainDb != 2 || rear.Side != 1 || rear.DelayMs != 17 || rear.DeviceId != rearDevice)
             throw new Exception("Layout change retained quad source index or changed physical output settings.");
+        var nativeDevice = new Endpoint("test-native", "Demo 5.1", 6, 48000, 0x3f); devices.Add(nativeDevice);
+        layout.SelectedItem = SpeakerLayouts.Get("7.1"); SelectSpeaker("FL");
+        destination.SelectedItem = destination.Items.Cast<DeviceChoice>().Single(d => d.Id == nativeDevice.Id);
+        nativeOutput.Checked = true;
+        if (outputSide.Items.Count != 6 || !Selected!.NativeOutput) throw new Exception("Native output selector did not expose all six channels");
+        SpeakerLayouts.ApplyQuickMap(speakers, nativeDevice); SelectSpeaker("FC");
+        if (Selected!.Side != 2 || (outputSide.SelectedItem as ChannelChoice)?.Index != 2) throw new Exception("Center output selector mismatch");
+        nativeOutput.Checked = false;
+        if (speakers.Where(s => s.DeviceId == nativeDevice.Id).Any(s => s.NativeOutput) || IsReady(Selected!)) throw new Exception("Stereo mode must invalidate higher channels on the whole device");
+        nativeOutput.Checked = true;
+        var roundTrip = SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(Draft()), devices);
+        SetProfile(roundTrip);
+        if (Draft().Speakers.Count(s => s.NativeOutput) != 6) throw new Exception("Native mappings lost on profile restore");
+        ShowAdvancedMenu();
+        var priorityMenu = (ToolStripMenuItem)advancedMenu.Items[1];
+        if (priorityMenu.DropDownItems.Count != 5) throw new Exception("Missing service priority choices");
+        ((ToolStripMenuItem)priorityMenu.DropDownItems[3]).PerformClick(); advancedMenu.Close();
+        if (Draft().ServicePriority != "AboveNormal") throw new Exception("Priority menu did not update draft");
+        var savedPriority = SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(Draft()), devices);
+        servicePriority = "Normal"; SetProfile(savedPriority); ShowAdvancedMenu();
+        if (!((ToolStripMenuItem)((ToolStripMenuItem)advancedMenu.Items[1]).DropDownItems[3]).Checked) throw new Exception("Priority menu did not restore saved selection");
+        advancedMenu.Close();
         return $"PASS: all 13 layouts populate diagram and inspector at {DeviceDpi} DPI\nPASS: no speaker overlap/clipping at default and compact sizes\nPASS: clicking diagram selects inspector speaker\nPASS: independent speaker gain, delay and mute editing\nPASS: running allows draft edits and speaker inspection\nPASS: small windows preserve the logical layout with scrolling\n";
     }
     public void PreviewLayout(string id) { layout.SelectedItem = SpeakerLayouts.Get(id); }
+    public void PrepareMultichannelPreview()
+    {
+        var device = new Endpoint("preview-native", "演示 5.1 音频设备", 6, 48000, 0x3f);
+        devices.Add(device); layout.SelectedItem = SpeakerLayouts.Get("7.1");
+        SpeakerLayouts.ApplyQuickMap(speakers, device); SelectSpeaker("FC"); Render();
+    }
     record SpeakerChoice(string Id, string Name) { public override string ToString() => Name; }
     record DeviceChoice(string Id, string Name) { public override string ToString() => Name; }
     record ChannelChoice(int Index, string Name) { public override string ToString() => Name; }

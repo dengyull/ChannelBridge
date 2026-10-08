@@ -169,6 +169,7 @@ static class Program
             using var f = new MainForm(); f.PreparePreview();
             if (args.Length >= 4) f.Size = new Size(int.Parse(args[2]), int.Parse(args[3]));
             if (args.Length >= 5) f.PreviewLayout(args[4]);
+            if (args.Contains("--native-preview")) f.PrepareMultichannelPreview();
             f.Show(); Application.DoEvents();
             using var b = new Bitmap(f.Width, f.Height); f.DrawToBitmap(b, new Rectangle(0, 0, f.Width, f.Height)); b.Save(args[1]); f.Close(); return;
         }

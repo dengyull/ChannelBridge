@@ -9,7 +9,7 @@ public record Endpoint(string Id, string Name, int Channels, int Rate, int Mask)
 {
     public override string ToString() => $"{Name}  [{Channels} ch · {Rate / 1000.0:g} kHz]";
 }
-public record Route(string DeviceId, int Left, int Right, float Gain, int DelayMs, float? RightGain = null, int? RightDelayMs = null);
+public record Route(string DeviceId, int Left, int Right, float Gain, int DelayMs, float? RightGain = null, int? RightDelayMs = null, OutputChannel[]? Outputs = null, bool NativeOutput = false, int OutputMask = 0);
 public record Profile(string SourceId, int Mode, List<Route> Routes);
 
 // Low-latency queues need capture packets sooner than the standard 50 ms poll.
@@ -22,11 +22,12 @@ sealed class ShortBufferLoopbackCapture(MMDevice device, int bufferMs) : WasapiC
 
 // Each physical device owns an independent clock. A small continuously adjusted
 // read ratio keeps its FIFO near the target, instead of periodically dropping blocks.
-public sealed class AdaptiveStereo : ISampleProvider
+public class AdaptiveOutput : ISampleProvider
 {
     readonly object gate = new();
     readonly float[] ring;
-    readonly int capacity, target, sourceRate, left, right;
+    readonly int capacity, target, sourceRate, outputChannels;
+    readonly int[] sources;
     readonly float[] gains;
     readonly int[] offsets;
     readonly int maxOffset;
@@ -41,17 +42,19 @@ public sealed class AdaptiveStereo : ISampleProvider
     public double BufferedMs { get { lock (gate) return Math.Max(0, written - read) * 1000 / sourceRate; } }
     public double CorrectionPpm { get { lock (gate) return (ratio - 1) * 1e6; } }
 
-    public AdaptiveStereo(int inputRate, int outputRate, int l, int r, float volume, int delayMs, float? rightVolume = null, int? rightDelayMs = null, int bufferMs = 80)
+    public AdaptiveOutput(int inputRate, WaveFormat outputFormat, OutputChannel[] channels, int bufferMs = 80)
     {
         if (bufferMs is < 10 or > 1000) throw new ArgumentOutOfRangeException(nameof(bufferMs));
-        sourceRate = inputRate; left = l; right = r;
-        gains = new[] { volume, rightVolume ?? volume };
-        int maxDelay = Math.Max(delayMs, rightDelayMs ?? delayMs);
-        offsets = new[] { inputRate * (maxDelay - delayMs) / 1000, inputRate * (maxDelay - (rightDelayMs ?? delayMs)) / 1000 };
+        if (channels.Length != outputFormat.Channels || channels.Length is < 1 or > 32) throw new ArgumentException("Invalid output channel count");
+        if (channels.Any(c => c.Source < -1 || !float.IsFinite(c.Gain) || c.Gain < 0 || c.Gain > 2 || c.DelayMs is < 0 or > 500)) throw new ArgumentException("Invalid output channel settings");
+        sourceRate = inputRate; outputChannels = channels.Length;
+        sources = channels.Select(c => c.Source).ToArray(); gains = channels.Select(c => c.Gain).ToArray();
+        int maxDelay = channels.Max(c => c.DelayMs);
+        offsets = channels.Select(c => inputRate * (maxDelay - c.DelayMs) / 1000).ToArray();
         maxOffset = offsets.Max();
-        capacity = inputRate * 3; ring = new float[capacity * 2];
+        capacity = inputRate * 3; ring = new float[capacity * outputChannels];
         target = inputRate * (bufferMs + maxDelay) / 1000;
-        WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(outputRate, 2);
+        WaveFormat = outputFormat;
     }
     public void Push(float[] samples, int frames, int channels)
     {
@@ -59,9 +62,8 @@ public sealed class AdaptiveStereo : ISampleProvider
         {
             for (int f = 0; f < frames; f++)
             {
-                int p = (int)(written % capacity) * 2;
-                ring[p] = left < 0 ? 0 : samples[f * channels + left] * gains[0];
-                ring[p + 1] = right < 0 ? 0 : samples[f * channels + right] * gains[1];
+                int p = (int)(written % capacity) * outputChannels;
+                for (int c = 0; c < outputChannels; c++) ring[p + c] = sources[c] < 0 ? 0 : samples[f * channels + sources[c]] * gains[c];
                 written++;
             }
             if (written - read >= capacity - 2)
@@ -86,17 +88,17 @@ public sealed class AdaptiveStereo : ISampleProvider
             double desired = 1 + Math.Clamp(error * 0.1, -0.003, 0.003);
             ratio += (desired - ratio) * 0.02;
             double step = (double)sourceRate / WaveFormat.SampleRate * ratio;
-            for (int i = 0; i + 1 < count; i += 2)
+            for (int i = 0; i + outputChannels <= count; i += outputChannels)
             {
                 if (read + maxOffset + 1 >= written)
                 {
                     Underruns++; primed = false; read = written; break;
                 }
-                for (int c = 0; c < 2; c++)
+                for (int c = 0; c < outputChannels; c++)
                 {
                     double position = read + offsets[c];
                     long a = (long)position;
-                    int p = (int)(a % capacity) * 2, q = (int)((a + 1) % capacity) * 2;
+                    int p = (int)(a % capacity) * outputChannels, q = (int)((a + 1) % capacity) * outputChannels;
                     float frac = (float)(position - a);
                     float value = ring[p + c] + (ring[q + c] - ring[p + c]) * frac;
                     value *= MasterGain;
@@ -113,12 +115,14 @@ public sealed class AdaptiveStereo : ISampleProvider
 
 public sealed class AudioEngine : IDisposable
 {
-    readonly List<(MMDevice Device, WasapiOut Player, AdaptiveStereo Buffer)> sinks = new();
+    readonly List<(MMDevice Device, WasapiOut Player, AdaptiveOutput Buffer)> sinks = new();
+    readonly Dictionary<string, (int Channels, int Mask, int Rate)> outputFormats = new();
+    public bool OutputFormatsMatch() => outputFormats.All(p => DeviceFormat(p.Key) == p.Value);
     MMDevice? source;
     WasapiCapture? capture;
     volatile bool stopping;
     public event Action<string>? Fault;
-    public IReadOnlyList<AdaptiveStereo> Buffers => sinks.Select(s => s.Buffer).ToArray();
+    public IReadOnlyList<AdaptiveOutput> Buffers => sinks.Select(s => s.Buffer).ToArray();
     public int SourceChannels { get; private set; }
     public long FramesCaptured;
     public long BufferUnderruns => sinks.Sum(s => s.Buffer.Underruns);
@@ -190,22 +194,21 @@ public sealed class AudioEngine : IDisposable
             ValidateFormat(format);
             foreach (var r in routes)
             {
-                if (r.Left < -1 || r.Right < -1 || r.Left >= format.Channels || r.Right >= format.Channels)
-                    throw new InvalidOperationException("映射超出音源实际声道数，请刷新设备并重新选择。");
-                if (!float.IsFinite(r.Gain) || r.Gain < 0 || r.Gain > 2 || r.DelayMs < 0 || r.DelayMs > 500 ||
-                    !float.IsFinite(r.RightGain ?? r.Gain) || (r.RightGain ?? r.Gain) < 0 || (r.RightGain ?? r.Gain) > 2 ||
-                    (r.RightDelayMs ?? r.DelayMs) < 0 || (r.RightDelayMs ?? r.DelayMs) > 500)
-                    throw new InvalidOperationException("音量或延迟超出范围。");
+                var channels = r.Outputs ?? new[] { new OutputChannel(r.Left, r.Gain, r.DelayMs), new OutputChannel(r.Right, r.RightGain ?? r.Gain, r.RightDelayMs ?? r.DelayMs) };
+                if (channels.Any(c => c.Source < -1 || c.Source >= format.Channels)) throw new InvalidOperationException("映射超出音源实际声道数，请刷新设备并重新选择。");
                 var device = enumerator.GetDevice(r.DeviceId);
                 WasapiOut? player = null;
                 try
                 {
                     using var formatClient = device.AudioClient;
                     var outputFormat = formatClient.MixFormat;
-                    if (outputFormat.Channels < 2) throw new InvalidOperationException($"{device.FriendlyName} 不是两声道设备。");
-                    var fifo = new AdaptiveStereo(format.SampleRate, outputFormat.SampleRate, r.Left, r.Right, r.Gain, r.DelayMs, r.RightGain, r.RightDelayMs, bufferMs);
+                    outputFormats[r.DeviceId] = (outputFormat.Channels, ChannelMask(outputFormat), outputFormat.SampleRate);
+                    if (r.NativeOutput && (outputFormat.Channels != channels.Length || ChannelMask(outputFormat) != r.OutputMask))
+                        throw new InvalidOperationException("设备声道布局已变化，请刷新设备并重新映射。");
+                    if (!r.NativeOutput && channels.Length != 2) throw new InvalidOperationException("立体声模式只能使用 L/R 输出。");
+                    var fifo = new AdaptiveOutput(format.SampleRate, OutputFormats.Float(outputFormat.SampleRate, channels.Length, r.OutputMask, r.NativeOutput), channels, bufferMs);
                     player = new WasapiOut(device, AudioClientShareMode.Shared, true, buffers.OutputMs);
-                    player.Init(new SampleToWaveProvider(fifo));
+                    player.Init(new FloatWaveProvider(fifo));
                     player.PlaybackStopped += (_, a) => { if (!stopping) Fault?.Invoke(a.Exception?.Message ?? "输出设备停止播放。"); };
                     sinks.Add((device, player, fifo));
                 }
@@ -262,24 +265,24 @@ public sealed class AudioEngine : IDisposable
         // Capture.Dispose joins its worker before the sink list is disposed.
         if (capture != null) { try { capture.StopRecording(); } catch { } capture.Dispose(); capture = null; }
         foreach (var s in sinks) { try { s.Player.Stop(); } catch { } s.Player.Dispose(); s.Device.Dispose(); }
-        sinks.Clear(); source?.Dispose(); source = null;
+        sinks.Clear(); outputFormats.Clear(); source?.Dispose(); source = null;
     }
 }
 
-public sealed class TestTone(int rate, int side, double frequency = 440) : ISampleProvider
+public sealed class TestTone(int rate, int side, double frequency = 440, int channels = 2, int mask = 0, bool native = false) : ISampleProvider
 {
     int position;
-    public WaveFormat WaveFormat { get; } = WaveFormat.CreateIeeeFloatWaveFormat(rate, 2);
+    public WaveFormat WaveFormat { get; } = OutputFormats.Float(rate, channels, mask, native);
     public int Read(float[] b, int offset, int count)
     {
-        int frames = Math.Min(count / 2, Math.Max(0, (int)(rate * .8) - position));
+        int frames = Math.Min(count / channels, Math.Max(0, (int)(rate * .8) - position));
         Array.Clear(b, offset, count);
         for (int n = 0; n < frames; n++, position++)
         {
             double t = (double)position / rate;
             double envelope = Math.Min(1, t / .02) * Math.Min(1, (.8 - t) / .04);
-            b[offset + n * 2 + side] = (float)(.08 * envelope * Math.Sin(2 * Math.PI * frequency * t));
+            b[offset + n * channels + side] = (float)(.08 * envelope * Math.Sin(2 * Math.PI * frequency * t));
         }
-        return frames * 2;
+        return frames * channels;
     }
 }

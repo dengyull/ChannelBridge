@@ -10,6 +10,7 @@ public sealed class AudioTestSequence : IDisposable
 {
     readonly List<SpeakerSetting> speakers;
     readonly bool simulate;
+    readonly int outputBufferMs;
     WasapiOut? player;
     MMDevice? device;
     MMDevice? volumeSource;
@@ -24,6 +25,7 @@ public sealed class AudioTestSequence : IDisposable
     {
         this.simulate = simulate;
         var p = SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(request.Profile), Array.Empty<Endpoint>());
+        outputBufferMs = p.Buffers.OutputMs;
         if (request.Role != null && !p.Speakers.Any(s => s.Role == request.Role)) throw new InvalidOperationException("测试音箱不在当前布局中。");
         // Use layout order, never JSON/property order, and never silently unmute a speaker.
         speakers = SpeakerLayouts.Get(p.LayoutId).Roles.Select(r => p.Speakers.Single(s => s.Role == r))
@@ -31,11 +33,12 @@ public sealed class AudioTestSequence : IDisposable
             .Where(s => !s.Muted && s.DeviceId.Length > 0 && s.SourceChannel >= 0).ToList();
         if (speakers.Count == 0) throw new InvalidOperationException("没有可测试音箱：请分配音源声道和输出设备，并取消静音。");
         if (speakers.Any(s => s.DeviceId == p.SourceId)) throw new InvalidOperationException("不能向音源回接测试音。");
-        if (speakers.GroupBy(s => (s.DeviceId, s.Side)).Any(g => g.Count() > 1)) throw new InvalidOperationException("测试配置包含重复的设备 L/R 输出。");
+        if (speakers.GroupBy(s => (s.DeviceId, s.Side)).Any(g => g.Count() > 1)) throw new InvalidOperationException("测试配置包含重复的设备输出声道。");
         if (!simulate)
         {
             var devices = AudioEngine.Devices();
-            if (speakers.Any(s => !devices.Any(d => d.Id == s.DeviceId && d.Channels >= 2))) throw new IOException("测试设备未连接。");
+            if (speakers.Any(s => !devices.Any(d => d.Id == s.DeviceId && d.Channels >= 1))) throw new IOException("测试设备未连接。");
+            foreach (var speaker in speakers) SpeakerLayouts.ValidateOutput(speaker, devices.Single(d => d.Id == speaker.DeviceId));
             if (p.FollowSourceVolume) { using var e = new MMDeviceEnumerator(); volumeSource = e.GetDevice(p.SourceId); }
         }
     }
@@ -50,10 +53,13 @@ public sealed class AudioTestSequence : IDisposable
         if (!simulate)
         {
             using var enumerator = new MMDeviceEnumerator(); device = enumerator.GetDevice(s.DeviceId);
-            player = new WasapiOut(device, AudioClientShareMode.Shared, true, 40);
+            player = new WasapiOut(device, AudioClientShareMode.Shared, true, outputBufferMs);
             player.PlaybackStopped += (_, e) => { if (e.Exception != null) Interlocked.Exchange(ref playbackError, e.Exception.Message); };
             using var formatClient = device.AudioClient;
-            signal = new TestSignal(formatClient.MixFormat.SampleRate, s) { MasterGain = VolumeGain() };
+            var f = formatClient.MixFormat;
+            var actual = AudioEngine.DeviceFormat(s.DeviceId);
+            SpeakerLayouts.ValidateOutput(s, new Endpoint(s.DeviceId, "", actual.Channels, actual.Rate, actual.Mask));
+            signal = new TestSignal(f.SampleRate, s, s.NativeOutput ? f.Channels : 2, actual.Mask) { MasterGain = VolumeGain() };
             player.Init(signal); player.Play();
         }
         next = now.AddMilliseconds(1300 + s.DelayMs);
@@ -72,17 +78,19 @@ public sealed class TestSignal : IWaveProvider
     int silenceFrames;
     public volatile float MasterGain = 1;
     public WaveFormat WaveFormat { get; }
-    public TestSignal(int rate, SpeakerSetting speaker)
+    public TestSignal(int rate, SpeakerSetting speaker, int channels = 2, int mask = 0)
     {
-        tone = new TestTone(rate, speaker.Side, speaker.Role == "LFE" ? 60 : 440);
+        if (speaker.Side < 0 || speaker.Side >= channels) throw new ArgumentOutOfRangeException(nameof(speaker.Side));
+        tone = new TestTone(rate, speaker.Side, speaker.Role == "LFE" ? 60 : 440, channels, mask, speaker.NativeOutput);
         WaveFormat = tone.WaveFormat; gain = speaker.LinearGain; silenceFrames = rate * speaker.DelayMs / 1000;
     }
     public int Read(byte[] buffer, int offset, int count)
     {
-        int frames = count / 8, silence = Math.Min(frames, silenceFrames); silenceFrames -= silence;
-        var samples = new float[frames * 2];
-        int read = tone.Read(samples, silence * 2, (frames - silence) * 2);
-        int total = silence * 2 + read;
+        int channels = WaveFormat.Channels;
+        int frames = count / WaveFormat.BlockAlign, silence = Math.Min(frames, silenceFrames); silenceFrames -= silence;
+        var samples = new float[frames * channels];
+        int read = tone.Read(samples, silence * channels, (frames - silence) * channels);
+        int total = silence * channels + read;
         for (int i = 0; i < total; i++) samples[i] *= gain * MasterGain;
         Buffer.BlockCopy(samples, 0, buffer, offset, total * 4);
         return total * 4;

@@ -7,7 +7,7 @@ using System.Text.Json;
 namespace ChannelBridge;
 
 public sealed record ServiceConfig(bool Enabled, SurroundProfile Profile, string Revision);
-public sealed record ServiceReport(string State, string Message, string Revision, long Frames, DateTime UpdatedUtc, int ProcessId, string TestRole = "", int TestIndex = 0, int TestCount = 0, string Version = "1.0.1", float SourceGain = 1, int SourceChannels = 0, int BufferMs = 80, long Underruns = 0, long Overruns = 0);
+public sealed record ServiceReport(string State, string Message, string Revision, long Frames, DateTime UpdatedUtc, int ProcessId, string TestRole = "", int TestIndex = 0, int TestCount = 0, string Version = "1.1.0", float SourceGain = 1, int SourceChannels = 0, int BufferMs = 80, long Underruns = 0, long Overruns = 0);
 
 public static class ServiceFiles
 {
@@ -43,6 +43,7 @@ public sealed class RoutingWorker : IDisposable
 {
     readonly string root;
     readonly bool simulate;
+    readonly Action<string> applyPriority;
     AudioEngine? engine;
     ServiceConfig? current;
     string? fault;
@@ -55,9 +56,10 @@ public sealed class RoutingWorker : IDisposable
     (int Channels, int Mask, int Rate) sourceFormat;
     CalibrationRun? calibration;
     string lastCalibrationId = "";
-    public RoutingWorker(string root, bool simulate = false)
+    public RoutingWorker(string root, bool simulate = false, Action<string>? applyPriority = null)
     {
         this.root = root; this.simulate = simulate;
+        this.applyPriority = applyPriority ?? (simulate ? _ => { } : ServicePriority.Apply);
         try { lastTestId = JsonSerializer.Deserialize<TestRequest>(File.ReadAllText(Path.Combine(root, "test.json")))?.Id ?? ""; } catch { }
         try { lastCalibrationId = JsonSerializer.Deserialize<CalibrationCommand>(File.ReadAllText(Path.Combine(root, "calibration-request.json")))?.Id ?? ""; } catch { }
     }
@@ -74,7 +76,10 @@ public sealed class RoutingWorker : IDisposable
                 catch { if (current == null && File.Exists(path + ".bak")) next = ServiceFiles.Read(path + ".bak"); else throw; }
             }
             if (next != null && next.Revision != current?.Revision)
-            { StopCalibration(); DisposeTest(); DisposeAudio(); current = next; retry = DateTime.MinValue; }
+            {
+                applyPriority(next.Profile.ServicePriority);
+                StopCalibration(); DisposeTest(); DisposeAudio(); current = next; retry = DateTime.MinValue;
+            }
             var error = Interlocked.Exchange(ref fault, null);
             if (error != null) { DisposeAudio(); retry = DateTime.UtcNow.AddSeconds(3); message = error; }
             HandleCalibrationCommand();
@@ -96,7 +101,7 @@ public sealed class RoutingWorker : IDisposable
                         {
                             nextFormatCheck = DateTime.UtcNow.AddSeconds(1);
                             var actual = AudioEngine.DeviceFormat(current.Profile.SourceId);
-                            if (sourceFormat != actual)
+                            if (sourceFormat != actual || !engine.OutputFormatsMatch())
                             { DisposeAudio(); retry = DateTime.MinValue; }
                         }
                     }

@@ -261,3 +261,33 @@ Windows 声道设置失败。	Windows speaker configuration failed.
 捕获和输出缓冲范围为 10–500ms，转发缓冲范围为 10–1000ms。	Capture and output buffers must be 10–500ms; routing must be 10–1000ms.
 确定	OK
 取消	Cancel
+使用设备多声道	Use device channels
+输出模式对同一设备的所有音箱生效；请检查各声道后应用配置。	Output mode applies to all speakers on this device. Check channel assignments, then apply.
+输出冲突：另一只音箱占用了相同的设备声道。	Conflict: another speaker uses this device channel.
+请检查音源、输出声道和设备布局。	Check source, output channel and device layout.
+当前发送设备多声道。	Sending the device's multichannel format.
+当前仅发送立体声。	Sending stereo only.
+设备声道布局已变化，请刷新设备并重新映射。	The device channel layout changed. Refresh devices and remap outputs.
+输出声道超出设备或立体声模式范围，请重新映射。	Output channel is outside the device or stereo range. Remap outputs.
+同一设备必须使用相同的输出模式。	All speakers on one device must use the same output mode.
+立体声模式只能使用 L/R 输出。	Stereo mode supports only L/R output.
+设备输出声道数必须为 1–32。	Device output channel count must be 1–32.
+快速映射…	Quick map…
+快速映射	Quick map
+是否按设备声道位置快速映射？	Map this device to the matching speaker positions?
+将替换这些音箱的原设备：	Existing device assignments will be replaced for:
+将解除该设备上无法匹配的位置：	Unmatched positions on this device will be unassigned:
+其他设备上未匹配的位置将保留。确认后仍需点击“应用配置”。	Unmatched positions on other devices will be preserved. Click Apply after confirming.
+驱动未报告可匹配的位置，请手动映射输出声道。	The driver did not report matching speaker positions. Map the output channels manually.
+演示 5.1 音频设备	Demo 5.1 audio device
+多个音箱占用了同一设备的同一输出声道。请修改右侧“输出接口”，每个设备声道只分配一个音箱。	Multiple speakers use the same device channel. Assign only one speaker to each output channel.
+测试配置包含重复的设备输出声道。	The test configuration contains duplicate device output channels.
+程序优先级（后台服务）	Process priority (background service)
+低优先级	Low
+低于正常	Below normal
+正常（默认）	Normal (default)
+高于正常	Above normal
+高优先级	High
+后台服务优先级将在应用配置后生效，并在服务重启后保留。	Service priority takes effect after Apply and is restored when the service restarts.
+无效的后台服务优先级。	Invalid background service priority.
+后台服务优先级未生效。	Background service priority was not applied.

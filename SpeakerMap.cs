@@ -53,7 +53,7 @@ public sealed class SpeakerMap : Panel
         base.OnMouseMove(e); string next = hit.FirstOrDefault(p => p.Value.Contains(new PointF(e.X / UiScale, e.Y / UiScale))).Key ?? ""; Cursor = next.Length > 0 ? Cursors.Hand : Cursors.Default;
         if (next == hovered) return; hovered = next; var s = Speakers.FirstOrDefault(s => s.Role == next);
         string deviceName = s == null ? "" : Devices.FirstOrDefault(d => d.Id == s.DeviceId)?.Name ?? UiLanguage.T("未分配设备");
-        tooltip.SetToolTip(this, s == null ? "" : UiLanguage.T($"{SpeakerLayouts.Role(s.Role).Name} {s.Role}\n") + deviceName + UiLanguage.T($" / {(s.Side == 0 ? "L" : "R")}\n{(s.SourceChannel >= 0 ? "音源 CH" + (s.SourceChannel + 1) : "未连接音源")} · {s.GainDb:+0.0;-0.0;0.0} dB · 延迟 {s.DelayMs} ms"));
+        tooltip.SetToolTip(this, s == null ? "" : UiLanguage.T($"{SpeakerLayouts.Role(s.Role).Name} {s.Role}\n") + deviceName + UiLanguage.T($" / {(s.NativeOutput ? "CH" + (s.Side + 1) : s.Side == 0 ? "L" : "R")}\n{(s.SourceChannel >= 0 ? "音源 CH" + (s.SourceChannel + 1) : "未连接音源")} · {s.GainDb:+0.0;-0.0;0.0} dB · 延迟 {s.DelayMs} ms"));
     }
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -83,7 +83,14 @@ public sealed class SpeakerMap : Panel
         foreach (var s in Speakers)
         {
             var rect = hit[s.Role]; bool selected = s.Role == SelectedRole;
-            bool ready = !s.Muted && s.SourceChannel >= 0 && s.SourceChannel < (Source?.Channels ?? 0) && s.DeviceId != Source?.Id && Devices.Any(d => d.Id == s.DeviceId) && !Speakers.Any(x => x != s && x.DeviceId == s.DeviceId && x.Side == s.Side);
+            bool outputReady = false;
+            var device = Devices.FirstOrDefault(d => d.Id == s.DeviceId);
+            if (device != null)
+            {
+                try { SpeakerLayouts.ValidateOutput(s, device); outputReady = true; }
+                catch (InvalidOperationException) { }
+            }
+            bool ready = !s.Muted && s.SourceChannel >= 0 && s.SourceChannel < (Source?.Channels ?? 0) && s.DeviceId != Source?.Id && outputReady && !Speakers.Any(x => x != s && x.DeviceId == s.DeviceId && x.Side == s.Side);
             using var fill = new SolidBrush(selected ? Color.FromArgb(238, 245, 255) : Color.White); using var border = new Pen(selected ? Accent : Color.FromArgb(222, 229, 238), selected ? 2 : 1);
             using var path = Rounded(rect, 11); g.FillPath(fill, path); g.DrawPath(border, path); float cx = rect.X + rect.Width / 2;
             using var speakerInk = new SolidBrush(s.Muted ? Color.FromArgb(170, 181, 195) : selected ? Accent : Color.FromArgb(83, 111, 147));
