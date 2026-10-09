@@ -69,3 +69,7 @@ Saved profiles use schema 3 and accept older profiles on import; older software 
 Open **Advanced settings → Process priority (background service)** and choose Low, Below normal, Normal (default), Above normal or High. Click **Apply** to change the service process priority. The UI process is unaffected. The selection is saved with the preset and restored when the service or computer restarts. Older presets use Normal.
 
 Priority affects scheduling under CPU contention. It does not change audio buffer values or guarantee crackle-free playback. Start with Normal; try Above normal if needed. Realtime priority is not offered. If applying priority fails, the error is reported and the previous running configuration is retained.
+
+## Output device system volume
+
+The speaker button, slider and percentage in the inspector control the selected output device's Windows master volume and mute immediately, without applying the preset. All channels and mappings on the same device share this volume. External Windows volume changes are reflected automatically. Controls are disabled when the device is unavailable. Gain and delay remain separate preset parameters. Advanced settings → Mute selected speaker only (after applying) retains per-route mute.

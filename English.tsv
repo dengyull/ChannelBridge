@@ -291,3 +291,9 @@ Windows 声道设置失败。	Windows speaker configuration failed.
 后台服务优先级将在应用配置后生效，并在服务重启后保留。	Service priority takes effect after Apply and is restored when the service restarts.
 无效的后台服务优先级。	Invalid background service priority.
 后台服务优先级未生效。	Background service priority was not applied.
+设备系统音量	Device system volume
+设备系统音量：立即生效，同一设备的所有声道共用。拖动滑块可解除设备静音。	Device system volume: applies immediately to all channels on this device. Moving the slider can unmute the device.
+未分配设备或设备不可用	No device assigned or device unavailable
+解除设备静音	Unmute device
+静音设备	Mute device
+仅静音选中音箱（应用后生效）	Mute selected speaker only (after applying)
