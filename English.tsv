@@ -291,3 +291,64 @@ Windows 声道设置失败。	Windows speaker configuration failed.
 后台服务优先级将在应用配置后生效，并在服务重启后保留。	Service priority takes effect after Apply and is restored when the service restarts.
 无效的后台服务优先级。	Invalid background service priority.
 后台服务优先级未生效。	Background service priority was not applied.
+实验性无线接收…	Experimental wireless receivers…
+实验性无线接收	Experimental wireless receivers
+启用 A2DP Sink（实验性）	Enable A2DP Sink (experimental)
+Windows 10 2004+ · 接收已配对手机的蓝牙音频。关闭界面不停止接收。\n声音由 Windows 播放；若要进入现有路由，请将系统默认播放设备设为 ChannelBridge 所选音源（通常为 CABLE Input）。蓝牙通常为立体声，不会自动生成环绕声。	Windows 10 2004+ · Receive Bluetooth audio from a paired phone. Closing this window keeps receiving.\nWindows plays the audio. To feed the existing routing, set the Windows default playback device to the selected source (usually CABLE Input). Bluetooth is normally stereo; no surround channels are synthesized.
+应用开关	Apply switch
+刷新 / 重试	Refresh / Retry
+连接并自动恢复	Connect and auto-reconnect
+断开并取消恢复	Disconnect and forget intent
+蓝牙配对设置	Bluetooth pairing settings
+连接状态	Connection state
+尝试	Attempts
+失败	Failures
+断线	Disconnects
+最近错误	Last error
+导出诊断报告	Export diagnostics
+请先选择蓝牙设备。	Select a Bluetooth device first.
+尚无无线接收状态。	No wireless receiver status is available yet.
+服务状态已过期；请检查服务是否运行。	Service status is stale; check whether the service is running.
+服务状态：	Service state:
+CPU 为整个服务占整机比例；不含 Windows 蓝牙解码进程。计数自本次连接任务开始。实际播放稳定性尚待实测。	CPU is the whole service's share of total machine capacity; Windows Bluetooth decoding is excluded. Connection counters start with each connection task. Playback stability still needs testing.
+AirPlay：暂未集成服务接收引擎。Chromecast：暂不支持通用接收，存在设备认证限制。\r\nA2DP：首次配对请使用 Windows 设置；服务会话兼容性需实机确认。被系统拒绝时不会反复重连，请点击刷新 / 重试。	AirPlay: no service receiver engine integrated yet. Chromecast: general receiving is unavailable due to device authentication requirements.\r\nA2DP: pair in Windows Settings first. Service-session compatibility needs hardware testing. System denial pauses retries; use Refresh / Retry.
+功能默认关闭。选择启用后点击“应用开关”，由后台服务开始发现已配对的设备。AirPlay 和 Chromecast 尚不可用。	Disabled by default. Select Enable, then Apply switch to let the service discover paired devices. AirPlay and Chromecast are not available yet.
+已关闭	Disabled
+已就绪	Ready
+可连接	Available
+等待设备	Waiting for device
+连接中	Connecting
+已连接	Connected
+等待重试	Waiting to retry
+需要重试 / 检查系统限制	Retry / check system restrictions
+无线接收配置无效。	Invalid wireless receiver configuration.
+无线接收配置过大。	Wireless receiver configuration is too large.
+无线接收配置为空。	Wireless receiver configuration is empty.
+蓝牙设备监视器已停止。	Bluetooth device watcher stopped.
+无法创建设备的 A2DP 连接。	Cannot create the device's A2DP connection.
+Windows 拒绝 A2DP 连接；服务会话或系统策略可能不支持此操作。	Windows denied A2DP; the service session or system policy may not support this operation.
+A2DP 连接超时。	A2DP connection timed out.
+蓝牙设备	Bluetooth device
+AirPlay 接收设置…	AirPlay receiver settings…
+AirPlay 实验性接收	Experimental AirPlay receiver
+启用 AirPlay（实验性）	Enable AirPlay (experimental)
+需要另行安装完整的 UxPlayEnhanced 接收引擎。选择包内的 uxplay.exe，由服务管理独立进程；默认关闭，不启用视频。\n声音通过 WASAPI 输出到已应用预设的音源（通常为 CABLE Input）；请按引擎说明配置私有网络防火墙。进程运行不代表已成功连接手机，兼容性和播放稳定性尚待实测。	Install the complete UxPlayEnhanced receiver separately, then select its uxplay.exe. The service manages a separate audio-only process; disabled by default.\nAudio uses WASAPI to the saved preset source (usually CABLE Input). Follow the engine's private-network firewall instructions. A running process does not prove phone connectivity; compatibility and playback stability need testing.
+接收引擎	Receiver engine
+接收名称	Receiver name
+打开接收引擎下载页	Open receiver engine download page
+应用 / 重试	Apply / Retry
+尚无 AirPlay 服务状态。	No AirPlay service status yet.
+引擎运行中（播放未验证）	Engine running (playback unverified)
+此处 CPU 仅统计 AirPlay 接收进程，占整机比例；不含 ChannelBridge 服务。连续失败五次后暂停，需手动应用 / 重试。	CPU is the AirPlay receiver's share of total machine capacity, excluding ChannelBridge. Five consecutive failures pause restarting; use Apply / Retry.
+功能默认关闭，尚未收到 AirPlay 服务状态。	Disabled by default. No AirPlay service status has been received yet.
+AirPlay 配置无效。	Invalid AirPlay configuration.
+请选择 UxPlayEnhanced 包中的 uxplay.exe。	Select uxplay.exe from a UxPlayEnhanced package.
+AirPlay 引擎已改变，请重新选择引擎并应用。	AirPlay engine changed. Select the engine again and apply.
+缺少 GStreamer 插件目录，请保留完整的 UxPlayEnhanced 包。	GStreamer plugins are missing. Keep the entire UxPlayEnhanced package.
+AirPlay 配置过大。	AirPlay configuration is too large.
+AirPlay 配置为空。	AirPlay configuration is empty.
+AirPlay 引擎意外退出：	AirPlay engine exited unexpectedly:
+无法启动 AirPlay 引擎。	Unable to start AirPlay engine.
+AirPlay：通过下方按钮配置独立接收引擎。Chromecast：暂不支持通用接收，存在设备认证限制。\r\nA2DP：首次配对请使用 Windows 设置；服务会话兼容性需实机确认。被系统拒绝时不会反复重连，请点击刷新 / 重试。	AirPlay: configure a separate receiver using the button below. Chromecast: general receiving is unavailable due to device authentication requirements.\r\nA2DP: pair in Windows Settings first. Service-session compatibility needs hardware testing. System denial pauses retries; use Refresh / Retry.
+功能默认关闭。选择启用后点击“应用开关”，由后台服务开始发现已配对的设备。AirPlay 需要单独安装接收引擎；Chromecast 尚不可用。	Disabled by default. Select Enable, then Apply switch for service discovery of paired devices. AirPlay requires a separate receiver installation; Chromecast is unavailable.
+选择…	Browse…

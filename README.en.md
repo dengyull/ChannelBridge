@@ -6,6 +6,8 @@
 
 Assign physical devices and output channels on a visual speaker map. A Windows service handles playback independently of the configuration UI.
 
+Development build `1.2.0-experimental.2` adds **Advanced settings → Experimental wireless receivers**: service-owned A2DP connections and an optional UxPlayEnhanced AirPlay process adapter. Disabled by default; Windows 10 2004+ required. Phone playback and service-session compatibility remain untested; Chromecast receiving is unavailable. See [experimental setup and evaluation](docs/Experimental%20wireless%20receivers.md).
+
 ![English interface with sample devices](docs/images/main-en.png)
 
 ## Features

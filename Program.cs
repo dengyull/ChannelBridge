@@ -8,12 +8,41 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--receiver-test-child")
+        {
+            using var stop = EventWaitHandle.OpenExisting(Environment.GetEnvironmentVariable("UXPLAYENHANCED_STOP_EVENT")!);
+            stop.WaitOne(TimeSpan.FromSeconds(20)); return;
+        }
         if (args.Length > 0 && args[0] == "--service") { System.ServiceProcess.ServiceBase.Run(new AudioWindowsService()); return; }
         if (args.Length == 2 && args[0] == "--service-host-test") { RoutingWorker.Run(args[1], true, CancellationToken.None).GetAwaiter().GetResult(); return; }
         ApplicationConfiguration.Initialize();
         UiLanguage.Load();
         if (args.Contains("--english")) UiLanguage.Set(true, false);
         if (args.Contains("--chinese")) UiLanguage.Set(false, false);
+        if (args.Length >= 2 && args[0] == "--wireless-check")
+        {
+            try { File.WriteAllText(args[1], WirelessChecks.Run(Path.GetDirectoryName(Path.GetFullPath(args[1]))!).GetAwaiter().GetResult()); }
+            catch (Exception ex) { File.WriteAllText(args[1], ex.ToString()); Environment.ExitCode = 1; }
+            return;
+        }
+        if (args.Length >= 2 && args[0] == "--airplay-check")
+        {
+            try { File.WriteAllText(args[1], AirPlayChecks.Run(Path.GetDirectoryName(Path.GetFullPath(args[1]))!)); }
+            catch (Exception ex) { File.WriteAllText(args[1], ex.ToString()); Environment.ExitCode = 1; }
+            return;
+        }
+        if (args.Length >= 2 && args[0] == "--wireless-ui-check")
+        {
+            using var form = new WirelessForm(true); form.Show(); Application.DoEvents();
+            using var bitmap = new Bitmap(form.Width, form.Height); form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size)); bitmap.Save(args[1]);
+            return;
+        }
+        if (args.Length >= 2 && args[0] == "--airplay-ui-check")
+        {
+            using var form = new AirPlayForm(true); form.Show(); Application.DoEvents();
+            using var bitmap = new Bitmap(form.Width, form.Height); form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size)); bitmap.Save(args[1]);
+            return;
+        }
         if (args.Length >= 2 && args[0] == "--buffer-ui-check")
         {
             using var form = new BufferSettingsForm(new BufferSettings(30, 65, 25));

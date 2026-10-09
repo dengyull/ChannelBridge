@@ -7,7 +7,7 @@ using System.Text.Json;
 namespace ChannelBridge;
 
 public sealed record ServiceConfig(bool Enabled, SurroundProfile Profile, string Revision);
-public sealed record ServiceReport(string State, string Message, string Revision, long Frames, DateTime UpdatedUtc, int ProcessId, string TestRole = "", int TestIndex = 0, int TestCount = 0, string Version = "1.1.0", float SourceGain = 1, int SourceChannels = 0, int BufferMs = 80, long Underruns = 0, long Overruns = 0);
+public sealed record ServiceReport(string State, string Message, string Revision, long Frames, DateTime UpdatedUtc, int ProcessId, string TestRole = "", int TestIndex = 0, int TestCount = 0, string Version = "1.2.0-experimental.2", float SourceGain = 1, int SourceChannels = 0, int BufferMs = 80, long Underruns = 0, long Overruns = 0);
 
 public static class ServiceFiles
 {
@@ -201,8 +201,11 @@ public sealed class AudioWindowsService : ServiceBase
         cancellation = new();
         // Consume stale test requests before SCM reports Running, so a fresh UI request cannot be lost.
         var routing = new RoutingWorker(ServiceFiles.Root);
-        worker = Task.Run(() => RoutingWorker.Run(ServiceFiles.Root, false, cancellation.Token, routing));
-        _ = worker.ContinueWith(t => Environment.Exit(1), TaskContinuationOptions.OnlyOnFaulted);
+        var tasks = new[] { Task.Run(() => RoutingWorker.Run(ServiceFiles.Root, false, cancellation.Token, routing)),
+            Task.Run(() => WirelessWorker.Run(ServiceFiles.Root, cancellation.Token)),
+            Task.Run(() => AirPlayWorker.Run(ServiceFiles.Root, cancellation.Token)) };
+        foreach (var task in tasks) _ = task.ContinueWith(t => Environment.Exit(1), TaskContinuationOptions.OnlyOnFaulted);
+        worker = Task.WhenAll(tasks);
     }
     protected override void OnStop() { cancellation?.Cancel(); if (worker != null && !worker.Wait(TimeSpan.FromSeconds(20))) Environment.Exit(1); }
     protected override void OnShutdown() => OnStop();

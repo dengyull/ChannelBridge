@@ -6,6 +6,8 @@
 
 面向 Windows 的可视化音频路由工具，适合把独立 USB 声卡、桌面音箱等组合成环绕声系统。后台服务负责播放，界面用于配置和测试。
 
+当前开发版 `1.2.0-experimental.2` 新增 **高级设置 → 实验性无线接收**：A2DP 服务连接管理，以及可选的 UxPlayEnhanced AirPlay 独立进程适配器。默认关闭，需要 Windows 10 2004+；手机播放和服务会话兼容性尚未实测，Chromecast 暂不可用。详见 [实验功能与评估步骤](docs/Experimental%20wireless%20receivers.md)。
+
 ![中文界面，使用演示设备](docs/images/main-zh.png)
 
 ## 功能

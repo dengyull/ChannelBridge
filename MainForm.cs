@@ -128,6 +128,7 @@ public sealed class MainForm : LanguageForm
             priorityMenu.DropDownItems.Add(item);
         }
         advancedMenu.Items.Add(priorityMenu);
+        advancedMenu.Items.Add(UiLanguage.T("实验性无线接收…"), null, (_, _) => { using var dialog = new WirelessForm(preview); dialog.ShowDialog(this); });
         advancedMenu.Show(advanced, new Point(0, advanced.Height));
     }
     void EditBuffers()

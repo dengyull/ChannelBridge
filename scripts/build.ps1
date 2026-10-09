@@ -16,7 +16,7 @@ try {
     dotnet publish ChannelBridge.csproj --no-restore -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o $publish
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
     $exe = Join-Path $publish 'ChannelBridge.exe'
-    foreach ($test in @('self-test','latency-check','audio-test-check','ui-test')) {
+    foreach ($test in @('self-test','latency-check','audio-test-check','ui-test','wireless-check','airplay-check')) {
         $report = Join-Path $reports "$test.txt"
         $process = Start-Process -FilePath $exe -ArgumentList @("--$test", ('"' + $report + '"')) -PassThru -WindowStyle Hidden
         if (!$process.WaitForExit(180000)) { $process.Kill(); throw "$test timed out" }
