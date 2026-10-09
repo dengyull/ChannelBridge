@@ -579,5 +579,3 @@ public sealed class MainForm : LanguageForm
     record DeviceChoice(string Id, string Name) { public override string ToString() => Name; }
     record ChannelChoice(int Index, string Name) { public override string ToString() => Name; }
 }
-
-
