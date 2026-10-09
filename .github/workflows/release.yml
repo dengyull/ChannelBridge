@@ -81,4 +81,8 @@ jobs:
             gh release create "$RELEASE_TAG" --verify-tag --draft --title "ChannelBridge $RELEASE_TAG" --notes-file "$notes"
           fi
           gh release upload "$RELEASE_TAG" release-assets/* --clobber
-          gh release edit "$RELEASE_TAG" --draft=false --latest
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
+          fi

@@ -7,8 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>ChannelBridge</AssemblyName>
-    <Version>1.1.0</Version>
-    <FileVersion>1.1.0.0</FileVersion>
+    <Version>1.1.1</Version>
+    <FileVersion>1.1.1.0</FileVersion>
   </PropertyGroup>
   <ItemGroup><PackageReference Include="NAudio" Version="2.2.1" /><PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.6" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="English.tsv" /></ItemGroup>

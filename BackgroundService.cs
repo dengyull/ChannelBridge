@@ -7,7 +7,7 @@ using System.Text.Json;
 namespace ChannelBridge;
 
 public sealed record ServiceConfig(bool Enabled, SurroundProfile Profile, string Revision);
-public sealed record ServiceReport(string State, string Message, string Revision, long Frames, DateTime UpdatedUtc, int ProcessId, string TestRole = "", int TestIndex = 0, int TestCount = 0, string Version = "1.1.0", float SourceGain = 1, int SourceChannels = 0, int BufferMs = 80, long Underruns = 0, long Overruns = 0);
+public sealed record ServiceReport(string State, string Message, string Revision, long Frames, DateTime UpdatedUtc, int ProcessId, string TestRole = "", int TestIndex = 0, int TestCount = 0, string Version = "1.1.1", float SourceGain = 1, int SourceChannels = 0, int BufferMs = 80, long Underruns = 0, long Overruns = 0);
 
 public static class ServiceFiles
 {
