@@ -164,6 +164,7 @@ static class Program
             catch (Exception ex) { File.WriteAllText(args[1], ex.ToString()); Environment.ExitCode = 1; }
             return;
         }
+        if (args.Length >= 2 && args[0] == "--volume-ui-check") { DeviceVolumeControl.RenderExample(args[1]); return; }
         if (args.Length >= 2 && args[0] == "--ui-check")
         {
             using var f = new MainForm(); f.PreparePreview();

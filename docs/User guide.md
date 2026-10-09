@@ -73,3 +73,4 @@ Priority affects scheduling under CPU contention. It does not change audio buffe
 ## Output device system volume
 
 The speaker button, slider and percentage in the inspector control the selected output device's Windows master volume and mute immediately, without applying the preset. All channels and mappings on the same device share this volume. External Windows volume changes are reflected automatically. Controls are disabled when the device is unavailable. Gain and delay remain separate preset parameters. Advanced settings → Mute selected speaker only (after applying) retains per-route mute.
+Click or drag the volume slider, use the mouse wheel (2 per notch), arrow keys (1), or Home/End (0/100). The number updates immediately.

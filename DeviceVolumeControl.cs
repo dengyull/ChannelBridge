@@ -32,11 +32,9 @@ internal sealed class WindowsDeviceVolume : IDeviceVolumeBackend
 internal sealed class DeviceVolumeControl : UserControl
 {
     readonly IDeviceVolumeBackend backend;
-    readonly Button toggle = new ModernButton { Dock = DockStyle.Fill, Text = "\uE767", Margin = Padding.Empty,
-        Font = new Font("Segoe MDL2 Assets", 15), TabIndex = 0 };
-    readonly TrackBar slider = new() { Dock = DockStyle.Fill, Minimum = 0, Maximum = 100, TickStyle = TickStyle.None,
-        AutoSize = false, SmallChange = 1, LargeChange = 5, Margin = Padding.Empty, TabIndex = 1 };
-    readonly Label number = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, Text = "—", Margin = Padding.Empty };
+    readonly WindowsVolumeButton toggle = new() { Dock = DockStyle.Fill, Margin = Padding.Empty, TabIndex = 0 };
+    readonly WindowsVolumeSlider slider = new() { Dock = DockStyle.Fill, Margin = Padding.Empty, TabIndex = 1 };
+    readonly Label number = new() { Font = new Font("Segoe UI", 18), Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, Text = "—", Margin = Padding.Empty };
     readonly ToolTip tip = new();
     string deviceId = "";
     bool refreshing, preview;
@@ -44,13 +42,14 @@ internal sealed class DeviceVolumeControl : UserControl
     public DeviceVolumeControl() : this(new WindowsDeviceVolume()) { }
     internal DeviceVolumeControl(IDeviceVolumeBackend backend)
     {
-        this.backend = backend; BackColor = Color.White; Height = 36;
+        this.backend = backend; AutoScaleMode = AutoScaleMode.None; BackColor = Color.White; Height = 36;
         var row = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty, Padding = Padding.Empty };
+        row.RowStyles.Add(new(SizeType.Percent, 100));
         row.ColumnStyles.Add(new(SizeType.Percent, 14)); row.ColumnStyles.Add(new(SizeType.Percent, 68)); row.ColumnStyles.Add(new(SizeType.Percent, 18));
         row.Controls.Add(toggle, 0, 0); row.Controls.Add(slider, 1, 0); row.Controls.Add(number, 2, 0); Controls.Add(row);
         slider.ValueChanged += (_, _) => {
             if (refreshing || preview || deviceId.Length == 0) return;
-            try { backend.SetLevel(deviceId, slider.Value / 100f); if (current.Muted && slider.Value > 0) backend.SetMute(deviceId, false); RefreshDevice(); }
+            try { backend.SetLevel(deviceId, slider.Value / 100f); if (current.Muted && slider.Value > 0) backend.SetMute(deviceId, false); current = backend.Read(deviceId); Display(); }
             catch (Exception ex) { Unavailable(ex.Message); }
         };
         toggle.Click += (_, _) => {
@@ -75,19 +74,29 @@ internal sealed class DeviceVolumeControl : UserControl
             current = backend.Read(deviceId); refreshing = true;
             try { slider.Value = Math.Clamp((int)Math.Round(current.Level * 100), 0, 100); }
             finally { refreshing = false; }
-            slider.Enabled = toggle.Enabled = true; number.Text = slider.Value + "%";
-            toggle.Text = current.Muted ? "\uE74F" : "\uE767";
+            slider.Enabled = toggle.Enabled = true; Display();
             toggle.AccessibleName = UiLanguage.T(current.Muted ? "解除设备静音" : "静音设备");
             tip.SetToolTip(toggle, toggle.AccessibleName + " · " + help);
         }
         catch (Exception ex) { Unavailable(ex.Message); }
     }
+    void Display() { number.Text = slider.Value.ToString(); toggle.Muted = current.Muted; toggle.Level = slider.Value; toggle.Invalidate(); }
     void Unavailable(string message)
     {
         slider.Enabled = toggle.Enabled = false; number.Text = "—";
-        toggle.Text = "\uE74F"; tip.SetToolTip(toggle, message); tip.SetToolTip(slider, message);
+        toggle.Muted = true; toggle.Invalidate(); tip.SetToolTip(toggle, message); tip.SetToolTip(slider, message);
     }
     protected override void Dispose(bool disposing) { if (disposing) tip.Dispose(); base.Dispose(disposing); }
+
+    internal static void RenderExample(string path)
+    {
+        var backend = new FakeVolume(); backend.Values["a"] = new(.68f, false);
+        using var form = new Form { ClientSize = new(720, 110), BackColor = Color.White, AutoScaleMode = AutoScaleMode.None };
+        using var control = new DeviceVolumeControl(backend) { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 20) };
+        form.Controls.Add(control); control.Bind("a", false); form.Show(); Application.DoEvents();
+        using var bitmap = new Bitmap(control.Width, control.Height);
+        control.DrawToBitmap(bitmap, control.ClientRectangle); bitmap.Save(path);
+    }
 
     internal static void Verify()
     {
@@ -100,6 +109,9 @@ internal sealed class DeviceVolumeControl : UserControl
         if (backend.Values["a"].Level != .6f || backend.Values["b"].Level != .25f) throw new Exception("Volume must target only selected device.");
         backend.Values["b"] = new(.72f, true); int before = backend.Writes; control.RefreshDevice();
         if (control.slider.Value != 72 || backend.Writes != before) throw new Exception("External changes must refresh without feedback writes.");
+        control.slider.Wheel(120); if (control.slider.Value != 74 || backend.Values["b"].Muted || control.number.Text != "74") throw new Exception("Wheel must adjust volume, unmute and update its number.");
+        control.slider.Value = 100; control.slider.Wheel(120); if (control.slider.Value != 100) throw new Exception("Wheel volume must clamp at 100.");
+        before = backend.Writes;
         control.Bind("missing", false); if (control.slider.Enabled) throw new Exception("Missing device must disable controls.");
         control.Bind("a", true); if (control.slider.Enabled || backend.Writes != before) throw new Exception("UI preview must never control real devices.");
     }
