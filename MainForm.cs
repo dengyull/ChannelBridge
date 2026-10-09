@@ -9,7 +9,7 @@ public sealed class MainForm : LanguageForm
     readonly ComboBox source = Combo(480), layout = Combo(280), speakerSelect = Combo(300), destination = Combo(300), sourceChannel = Combo(300), outputSide = Combo(300);
     readonly NumericUpDown gain = new() { DecimalPlaces = 1, Increment = .5m, Minimum = -60, Maximum = 6, Width = 136 };
     readonly NumericUpDown delay = new() { Maximum = 500, Width = 136 };
-    readonly CheckBox mute = new() { Text = "静音此音箱", AutoSize = true };
+    readonly DeviceVolumeControl deviceVolume = new();
     readonly CheckBox nativeOutput = new() { Text = "使用设备多声道", AutoSize = true };
     readonly CheckBox lowLatency = new() { Text = "低延迟（缓冲 50ms）", AutoSize = true, Margin = new(6, 8, 8, 3) };
     readonly ToolTip latencyTip = new();
@@ -77,7 +77,7 @@ public sealed class MainForm : LanguageForm
         Place(Caption("音源声道"), 18, 136); Place(sourceChannel, 22, 164, 310);
         Place(Caption("输出设备"), 18, 210); Place(destination, 22, 238, 310);
         Place(Caption("输出接口"), 18, 284); outputSide.Items.AddRange(new object[] { "L · 设备左声道", "R · 设备右声道" }); outputSide.SelectedIndex = 0; Place(outputSide, 22, 312, 310);
-        Place(Caption("增益 / dB"), 18, 358); Place(Caption("延迟补偿 / ms"), 185, 358); Place(gain, 22, 386); Place(delay, 189, 386); Place(mute, 22, 435);
+        Place(Caption("增益 / dB"), 18, 358); Place(Caption("延迟补偿 / ms"), 185, 358); Place(gain, 22, 386); Place(delay, 189, 386); Place(deviceVolume, 22, 435, 310);
         test = Button("▶ 播放测试音频", () => RequestTest(false)); Place(test, 22, 473, 310);
         detail.AutoSize = false; detail.Size = new(310, 96); detail.ForeColor = MutedInk; Place(detail, 22, 527);
         Place(nativeOutput, 22, 277);
@@ -96,7 +96,7 @@ public sealed class MainForm : LanguageForm
         map.SpeakerSelected += SelectSpeaker;
         sourceChannel.SelectedIndexChanged += (_, _) => EditSelected(); destination.SelectedIndexChanged += (_, _) => ChangeDestination(); outputSide.SelectedIndexChanged += (_, _) => EditSelected();
         nativeOutput.CheckedChanged += (_, _) => ChangeOutputMode();
-        gain.ValueChanged += (_, _) => EditSelected(); delay.ValueChanged += (_, _) => EditSelected(); mute.CheckedChanged += (_, _) => EditSelected();
+        gain.ValueChanged += (_, _) => EditSelected(); delay.ValueChanged += (_, _) => EditSelected();
         timer.Tick += (_, _) => UpdateMeters(); timer.Start();
         FormClosing += (_, _) => { timer.Dispose(); latencyTip.Dispose(); advancedMenu.Dispose(); };
         speakers = SpeakerLayouts.Create(CurrentLayout, null); RefreshDevices(); Render();
@@ -116,6 +116,9 @@ public sealed class MainForm : LanguageForm
     void ShowAdvancedMenu()
     {
         advancedMenu.Items.Clear();
+        var routeMute = new ToolStripMenuItem(UiLanguage.T("仅静音选中音箱（应用后生效）")) { Checked = Selected?.Muted == true, Enabled = Selected != null };
+        routeMute.Click += (_, _) => { if (Selected is { } s) { s.Muted = !s.Muted; Render(); } };
+        advancedMenu.Items.Add(routeMute);
         advancedMenu.Items.Add(UiLanguage.T("音频缓冲…"), null, (_, _) => EditBuffers());
         var priorityMenu = new ToolStripMenuItem(UiLanguage.T("程序优先级（后台服务）"));
         foreach (var option in ServicePriority.Options)
@@ -178,7 +181,7 @@ public sealed class MainForm : LanguageForm
         fittingInspector = true;
         inspector.SuspendLayout();
         var scroll = inspector.AutoScrollPosition;
-        int[] ys = { 12, 36, 0, 76, 95, 131, 150, 186, 205, 241, 241, 260, 260, 298, 294, 333, 183, 219 };
+        int[] ys = { 12, 36, 0, 76, 95, 131, 150, 186, 205, 241, 241, 260, 260, 298, 340, 382, 183, 219 };
         int usable = Math.Max(Px(230), inspector.ClientSize.Width - Px(32));
         for (int i = 0; i < inspectorSpec.Count; i++)
         {
@@ -189,10 +192,10 @@ public sealed class MainForm : LanguageForm
             if (i >= 7 && i <= 15) y += 72;
             if (automaticSource && i >= 5) y -= compact ? 55 : 74;
             if (compact && (i == 10 || i == 12)) x = 16 + (int)(usable / (DeviceDpi / 96f) / 2) + 5;
-            if (compact && i == 14) x = 148;
+
             c.Location = new(Px(x) + scroll.X, Px(y) + scroll.Y);
             if (item.Width > 0) c.Width = usable;
-            if (compact && i == 14) c.Width = usable - Px(132);
+            if (i == 13) c.Height = Px(36);
             if (i == 11 || i == 12) c.Width = compact ? usable / 2 - Px(5) : Px(136);
             if (i == 14) c.Height = Px(32);
             if (i == 15) { c.Width = usable; c.Height = Px(UiLanguage.English ? 176 : 108); }
@@ -298,7 +301,7 @@ public sealed class MainForm : LanguageForm
             outputSide.Items.AddRange(names.Select((name, index) => new ChannelChoice(index, name)).Cast<object>().ToArray());
             if (v.Side >= names.Length) outputSide.Items.Add(new ChannelChoice(v.Side, $"[不可用] 原声道 {v.Side + 1}"));
             outputSide.SelectedItem = outputSide.Items.Cast<ChannelChoice>().FirstOrDefault(c => c.Index == v.Side);
-            gain.Value = (decimal)v.GainDb; delay.Value = v.DelayMs; mute.Checked = v.Muted; UpdateDetail();
+            gain.Value = (decimal)v.GainDb; delay.Value = v.DelayMs; deviceVolume.Bind(v.DeviceId == Source?.Id ? "" : v.DeviceId, preview); UpdateDetail();
         }
         finally { loading = prior; }
     }
@@ -308,7 +311,7 @@ public sealed class MainForm : LanguageForm
         s.SourceChannel = (sourceChannel.SelectedItem as ChannelChoice)?.Index ?? -1;
         s.Side = (outputSide.SelectedItem as ChannelChoice)?.Index ?? 0;
         if (s.NativeOutput && devices.FirstOrDefault(d => d.Id == s.DeviceId) is { } device) { s.DeviceChannelMask = device.Mask; s.DeviceChannels = device.Channels; }
-        s.GainDb = (float)gain.Value; s.DelayMs = (int)delay.Value; s.Muted = mute.Checked; Render();
+        s.GainDb = (float)gain.Value; s.DelayMs = (int)delay.Value; Render();
     }
     void ChangeDestination()
     {
@@ -404,6 +407,7 @@ public sealed class MainForm : LanguageForm
     void RestartService() => ServiceAction(ServiceSetup.Restart);
     void UpdateMeters()
     {
+        deviceVolume.RefreshDevice();
         if (preview || serviceBusy) return;
         if (DateTime.UtcNow >= nextSourceRefresh)
         {
@@ -526,7 +530,8 @@ public sealed class MainForm : LanguageForm
             }
         }
         map.SelectAt(map.SpeakerCenter("SR")); if (Selected?.Role != "SR") throw new Exception("Diagram selection did not update inspector.");
-        SelectSpeaker("LFE"); gain.Value = -8; delay.Value = 37; mute.Checked = true;
+        DeviceVolumeControl.Verify();
+        SelectSpeaker("LFE"); Selected!.Muted = true; gain.Value = -8; delay.Value = 37;
         if (Selected?.GainDb != -8 || Selected.DelayMs != 37 || !Selected.Muted) throw new Exception("Inspector failed to update selected speaker.");
         SelectSpeaker("FL"); if (Selected?.GainDb == -8) throw new Exception("Gain leaked into a different speaker.");
         SetRunning(true); if (!gain.Enabled || !layout.Enabled || !speakerSelect.Enabled || !map.Enabled) throw new Exception("Running draft editing broken."); SetRunning(false);
@@ -553,13 +558,13 @@ public sealed class MainForm : LanguageForm
         SetProfile(roundTrip);
         if (Draft().Speakers.Count(s => s.NativeOutput) != 6) throw new Exception("Native mappings lost on profile restore");
         ShowAdvancedMenu();
-        var priorityMenu = (ToolStripMenuItem)advancedMenu.Items[1];
+        var priorityMenu = (ToolStripMenuItem)advancedMenu.Items[2];
         if (priorityMenu.DropDownItems.Count != 5) throw new Exception("Missing service priority choices");
         ((ToolStripMenuItem)priorityMenu.DropDownItems[3]).PerformClick(); advancedMenu.Close();
         if (Draft().ServicePriority != "AboveNormal") throw new Exception("Priority menu did not update draft");
         var savedPriority = SpeakerLayouts.ReadProfile(JsonSerializer.Serialize(Draft()), devices);
         servicePriority = "Normal"; SetProfile(savedPriority); ShowAdvancedMenu();
-        if (!((ToolStripMenuItem)((ToolStripMenuItem)advancedMenu.Items[1]).DropDownItems[3]).Checked) throw new Exception("Priority menu did not restore saved selection");
+        if (!((ToolStripMenuItem)((ToolStripMenuItem)advancedMenu.Items[2]).DropDownItems[3]).Checked) throw new Exception("Priority menu did not restore saved selection");
         advancedMenu.Close();
         return $"PASS: all 13 layouts populate diagram and inspector at {DeviceDpi} DPI\nPASS: no speaker overlap/clipping at default and compact sizes\nPASS: clicking diagram selects inspector speaker\nPASS: independent speaker gain, delay and mute editing\nPASS: running allows draft edits and speaker inspection\nPASS: small windows preserve the logical layout with scrolling\n";
     }
@@ -574,3 +579,5 @@ public sealed class MainForm : LanguageForm
     record DeviceChoice(string Id, string Name) { public override string ToString() => Name; }
     record ChannelChoice(int Index, string Name) { public override string ToString() => Name; }
 }
+
+

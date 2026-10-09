@@ -352,3 +352,9 @@ AirPlay 引擎意外退出：	AirPlay engine exited unexpectedly:
 AirPlay：通过下方按钮配置独立接收引擎。Chromecast：暂不支持通用接收，存在设备认证限制。\r\nA2DP：首次配对请使用 Windows 设置；服务会话兼容性需实机确认。被系统拒绝时不会反复重连，请点击刷新 / 重试。	AirPlay: configure a separate receiver using the button below. Chromecast: general receiving is unavailable due to device authentication requirements.\r\nA2DP: pair in Windows Settings first. Service-session compatibility needs hardware testing. System denial pauses retries; use Refresh / Retry.
 功能默认关闭。选择启用后点击“应用开关”，由后台服务开始发现已配对的设备。AirPlay 需要单独安装接收引擎；Chromecast 尚不可用。	Disabled by default. Select Enable, then Apply switch for service discovery of paired devices. AirPlay requires a separate receiver installation; Chromecast is unavailable.
 选择…	Browse…
+设备系统音量	Device system volume
+设备系统音量：立即生效，同一设备的所有声道共用。拖动滑块可解除设备静音。	Device system volume: applies immediately to all channels on this device. Moving the slider can unmute the device.
+未分配设备或设备不可用	No device assigned or device unavailable
+解除设备静音	Unmute device
+静音设备	Mute device
+仅静音选中音箱（应用后生效）	Mute selected speaker only (after applying)
